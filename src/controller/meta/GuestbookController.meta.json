@@ -1,0 +1,49 @@
+{
+  "name": "GuestbookController",
+  "basePath": "/api/guestbook",
+  "controllerType": "DB",
+  "serviceName": "GuestbookService",
+  "description": "",
+  "auth": true,
+  "roles": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "list",
+      "handlerName": "list",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "handler": "get",
+      "handlerName": "get",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "handler": "create",
+      "handlerName": "create",
+      "type": "custom"
+    },
+    {
+      "method": "PUT",
+      "path": "/:id",
+      "handler": "update",
+      "handlerName": "update",
+      "type": "custom"
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "handler": "remove",
+      "handlerName": "remove",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.928Z",
+  "_version": 2
+}

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>파일 업로드 실습실 — aidot-express</title>
+  <style>
+    body { font-family: 'Pretendard', 'Malgun Gothic', system-ui, sans-serif; margin: 0; background: #F7F8FC; color: #1F2437; }
+    header { background: #1F2437; color: #fff; padding: 14px 24px; font-weight: 700; }
+    header span { color: #9AA6D4; font-weight: 400; margin-left: 10px; font-size: 13px; }
+    main { max-width: 980px; margin: 24px auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #D9DDEA; border-radius: 10px; padding: 18px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+    label { display: block; font-size: 13px; color: #4A5468; margin: 10px 0 4px; }
+    input[type=text] { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #C7CEE0; border-radius: 6px; font-family: 'Courier New', monospace; }
+    button { background: #F96167; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+    button.gray { background: #6B7280; }
+    pre { background: #1E2233; color: #E8ECF8; padding: 12px; border-radius: 8px; font-size: 12px; overflow: auto; min-height: 120px; white-space: pre-wrap; word-break: break-all; }
+    .note { background: #FDF6D8; border: 1px solid #F9E795; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-top: 12px; }
+    .step { display: inline-block; background: #F96167; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-size: 12px; margin-right: 6px; }
+    img.preview { max-width: 100%; border-radius: 8px; border: 1px solid #D9DDEA; margin-top: 8px; }
+    a { color: #2F3C7E; }
+  </style>
+</head>
+<body>
+  <header>파일 업로드 실습실 <span>파일 → base64 글자 → 보통의 JSON POST</span></header>
+  <main>
+    <section class="card">
+      <h2><span class="step">1</span>파일 고르기 → <span class="step">2</span>보내기</h2>
+      <label>업로드 주소 (내가 만든 컨트롤러)</label>
+      <input id="url" type="text" value="/api/files/" />
+      <label>파일</label>
+      <input id="file" type="file" />
+      <button onclick="uploadOne()">업로드</button>
+      <button class="gray" onclick="listAll()">올린 파일 목록</button>
+      <div class="note">
+        컨트롤러가 없다면 <b>docs/answers/upload/FileController.js</b> 를
+        <code>workspace/controller/</code> 에 복사하고 서버를 켜세요 (주소 <code>/api/files/</code>).<br />
+        서버에 원래 있는 <code>/api/uploads/</code> 는 관리자 로그인이 필요합니다.
+      </div>
+    </section>
+    <section class="card">
+      <h2><span class="step">3</span>서버가 보낸 답</h2>
+      <pre id="out">여기에 결과가 나옵니다.</pre>
+      <div id="link"></div>
+    </section>
+  </main>
+  <script>
+    // ① 파일을 "글자" 로 바꾼다 — FileReader.readAsDataURL → "data:image/png;base64,iVBOR..."
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);      // data: 접두어까지 통째로 — 서버가 잘라 씁니다
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+    }
+    // ② 보통의 JSON POST — 컨트롤러는 params 하나만 받으면 됩니다
+    async function uploadOne() {
+      const f = document.getElementById('file').files[0];
+      const out = document.getElementById('out');
+      if (!f) { out.textContent = '파일을 먼저 고르세요.'; return; }
+      out.textContent = '보내는 중…';
+      const t0 = Date.now();
+      try {
+        const fileBase64 = await fileToBase64(f);
+        const res = await fetch(document.getElementById('url').value, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: f.name, fileBase64 }),
+        });
+        const text = await res.text();
+        out.textContent = `${res.status} (${Date.now() - t0} ms)\n` + text;
+        // ③ 올린 파일은 /uploads/<이름> 으로 바로 열린다
+        try {
+          const json = JSON.parse(text);
+          const url = json?.data?.url;
+          document.getElementById('link').innerHTML = url
+            ? `<p>열어 보기: <a href="${url}" target="_blank">${url}</a></p>` + (/\.(png|jpe?g|gif|webp)$/i.test(url) ? `<img class="preview" src="${url}" />` : '')
+            : '';
+        } catch { /* JSON 이 아니면 그대로 둔다 */ }
+      } catch (e) {
+        out.textContent = '오류: ' + e.message;
+      }
+    }
+    async function listAll() {
+      const out = document.getElementById('out');
+      const res = await fetch(document.getElementById('url').value);
+      out.textContent = `${res.status}\n` + await res.text();
+    }
+  </script>
+</body>
+</html>

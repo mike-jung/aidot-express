@@ -1,0 +1,11 @@
+
+# keep line endings stable across Windows/Linux — the sync/push logs were full of CRLF warnings
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.pptx binary
+*.xlsx binary
+*.zip binary
+*.exe binary
+*.AppImage binary

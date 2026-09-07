@@ -1,0 +1,30 @@
+{
+  "name": "GuestbookService",
+  "sqlFile": "guestbook",
+  "description": "",
+  "methods": [
+    {
+      "name": "list",
+      "type": "custom"
+    },
+    {
+      "name": "getById",
+      "type": "custom"
+    },
+    {
+      "name": "create",
+      "type": "custom"
+    },
+    {
+      "name": "update",
+      "type": "custom"
+    },
+    {
+      "name": "remove",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.924Z",
+  "_version": 2
+}

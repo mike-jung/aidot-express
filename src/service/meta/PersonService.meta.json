@@ -1,0 +1,13 @@
+{
+  "name": "PersonService",
+  "sqlFile": "person",
+  "description": "Person 서비스 테스트",
+  "methods": [
+    "list",
+    "getById",
+    "create"
+  ],
+  "multiSqlMethods": [],
+  "_generatedAt": "2026-04-17T23:52:05.608Z",
+  "_version": 1
+}

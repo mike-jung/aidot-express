@@ -1,0 +1,103 @@
+{
+  "name": "BookController",
+  "basePath": "/api/books",
+  "controllerType": "DB",
+  "serviceName": "BookService",
+  "description": "",
+  "auth": false,
+  "roles": [],
+  "routes": [
+    {
+      "type": "list",
+      "method": "get",
+      "path": "/",
+      "handlerName": "list",
+      "auth": false,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [
+        "BookService.list"
+      ],
+      "_sqlQueries": [],
+      "handler": "list"
+    },
+    {
+      "type": "getById",
+      "method": "get",
+      "path": "/:id",
+      "handlerName": "get",
+      "auth": false,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [
+        "BookService.get"
+      ],
+      "_sqlQueries": [],
+      "handler": "get"
+    },
+    {
+      "type": "create",
+      "method": "post",
+      "path": "/",
+      "handlerName": "create",
+      "auth": false,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [
+        "BookService.create"
+      ],
+      "_sqlQueries": [],
+      "handler": "create"
+    },
+    {
+      "type": "updateName",
+      "method": "put",
+      "path": "/:id",
+      "handlerName": "update",
+      "auth": false,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [
+        "BookService.update"
+      ],
+      "_sqlQueries": [],
+      "handler": "update"
+    },
+    {
+      "type": "remove",
+      "method": "delete",
+      "path": "/:id",
+      "handlerName": "remove",
+      "auth": false,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [
+        "BookService.remove"
+      ],
+      "_sqlQueries": [],
+      "handler": "remove"
+    }
+  ],
+  "_generatedAt": "2026-05-28T07:43:59.418Z",
+  "_version": 2
+}

@@ -1,0 +1,35 @@
+{
+  "name": "UploadController",
+  "basePath": "/api/uploads",
+  "controllerType": "DB",
+  "serviceName": null,
+  "description": "",
+  "auth": false,
+  "roles": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/",
+      "handler": "upload",
+      "handlerName": "upload",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/multipart",
+      "handler": "uploadMultipart",
+      "handlerName": "uploadMultipart",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "list",
+      "handlerName": "list",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.928Z",
+  "_version": 2
+}

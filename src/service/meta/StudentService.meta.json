@@ -1,0 +1,34 @@
+{
+  "name": "StudentService",
+  "sqlFile": "student",
+  "description": "",
+  "methods": [
+    {
+      "name": "list",
+      "type": "custom"
+    },
+    {
+      "name": "listPaged",
+      "type": "custom"
+    },
+    {
+      "name": "getById",
+      "type": "custom"
+    },
+    {
+      "name": "create",
+      "type": "custom"
+    },
+    {
+      "name": "updateName",
+      "type": "custom"
+    },
+    {
+      "name": "remove",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.924Z",
+  "_version": 2
+}

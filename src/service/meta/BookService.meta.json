@@ -1,0 +1,13 @@
+{
+  "name": "BookService",
+  "sqlFile": "book",
+  "description": "",
+  "methods": [
+    "list",
+    "getById",
+    "create"
+  ],
+  "multiSqlMethods": [],
+  "_generatedAt": "2026-05-28T07:44:24.005Z",
+  "_version": 2
+}
