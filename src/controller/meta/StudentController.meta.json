@@ -1,0 +1,42 @@
+{
+  "name": "StudentController",
+  "basePath": "/api/students",
+  "controllerType": "DB",
+  "serviceName": "StudentService",
+  "description": "",
+  "auth": false,
+  "roles": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "list",
+      "handlerName": "list",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/paged",
+      "handler": "listPaged",
+      "handlerName": "listPaged",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "handler": "get",
+      "handlerName": "get",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "handler": "create",
+      "handlerName": "create",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.928Z",
+  "_version": 2
+}

@@ -1,0 +1,28 @@
+{
+  "name": "EventStreamController",
+  "basePath": "/api/events",
+  "controllerType": "DB",
+  "serviceName": null,
+  "description": "",
+  "auth": true,
+  "roles": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/publish",
+      "handler": "publish",
+      "handlerName": "publish",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "handler": "stats",
+      "handlerName": "stats",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.928Z",
+  "_version": 2
+}

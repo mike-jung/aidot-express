@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>방명록 API 실습실 — aidot-express</title>
+<style>
+  :root{
+    --navy:#2F3C7E; --coral:#F96167; --ink:#1F2437; --muted:#6B7280;
+    --line:#D9DDEA; --bg:#F7F8FC; --code:#111827; --green:#12A150; --blue:#3B5BDB;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif;}
+  header{background:var(--navy);color:#fff;padding:18px 24px}
+  header h1{margin:0;font-size:20px}
+  header p{margin:6px 0 0;font-size:13px;color:#C7D0EE}
+  main{max-width:1180px;margin:0 auto;padding:20px 24px 60px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:16px;color:var(--navy)}
+  .card .hint{margin:0 0 12px;font-size:12px;color:var(--muted)}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  input,textarea{width:100%;font-family:Consolas,"Courier New",monospace;padding:8px 10px;border:1px solid #C7CEE0;border-radius:6px;
+                 font-size:14px;font-family:inherit}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  button{margin-top:12px;padding:9px 14px;border:0;border-radius:6px;color:#fff;
+         font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+  button:hover{opacity:.9}
+  .b-get{background:var(--green)} .b-post{background:var(--blue)}
+  .b-put{background:#C77700} .b-del{background:var(--coral)} .b-gray{background:#6B7280}
+  .badge{display:inline-block;min-width:52px;text-align:center;padding:2px 8px;border-radius:4px;
+         font-size:11px;font-weight:700;color:#fff;margin-right:6px}
+  pre{background:var(--code);color:#D6DEF5;border-radius:8px;padding:12px 14px;margin:0;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;line-height:1.55;
+      max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+  .status{font-size:12px;font-weight:700;margin-left:8px}
+  .ok{color:var(--green)} .err{color:var(--coral)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#9AA3BC;margin-right:6px}
+  .dot.on{background:var(--green)} .dot.off{background:var(--coral)}
+  .log{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+       max-height:260px;overflow:auto;font-size:12.5px}
+  .log div{padding:4px 0;border-bottom:1px dashed #E7EAF3}
+  .log time{color:var(--muted);margin-right:8px;font-family:Consolas,monospace}
+</style>
+</head>
+<body>
+<header>
+  <h1>방명록 API 실습실</h1>
+  <p>aidot-express 에 기본으로 들어 있는 <b>방명록(guestbook)</b> 예제입니다. 설치하고 서버만 켜면 바로 눌러 볼 수 있어요.</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2>서버 주소</h2>
+    <p class="hint">
+      이 페이지를 서버에서 열었다면 Base URL 은 비워 두세요. 다른 PC 에서 열었다면 http://서버IP:7901 처럼 적습니다.<br>
+      기본 경로는 <b class="ep-base">/api/guestbook</b> (기본 예제)입니다. 따라하기 ③ 에서 직접 만든
+      <b>/api/snacks</b> 나 <b>/api/supplies</b> 로 바꿔서 시험해도 됩니다 —
+      그때는 아래 <b>[보낼 내용]</b> 칸의 JSON 만 그 API 에 맞게 고치면 돼요.
+    </p>
+    <div class="row">
+      <div>
+        <label>Base URL</label>
+        <input id="baseUrl" placeholder="(비우면 이 페이지와 같은 서버)" />
+      </div>
+      <div>
+        <label>기본 경로</label>
+        <input id="basePath" value="/api/guestbook" />
+      </div>
+      <!-- ★ v1.29.2 — GET·DELETE 는 본문을 못 싣는다.
+           requestCode 처럼 서버가 요구하는 값을 넣을 자리가 없어 시험해 볼 수 없었다.
+           여기에 적은 것은 **모든 요청**의 주소 뒤에 붙는다(POST·PUT 도 함께). -->
+      <div>
+        <label>요청 파라미터 <span class="muted">(주소 뒤에 붙습니다)</span></label>
+        <input id="queryParams" placeholder="requestCode=ABC&amp;lang=ko" />
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- 1) 전체 조회 -->
+    <div class="card">
+      <h2><span class="badge b-get">GET</span>① 글 전체 보기</h2>
+      <p class="hint">GET <span class="ep" data-tail="/">/api/guestbook/</span></p>
+      <button class="b-get" onclick="listAll()">전체 불러오기</button>
+      <span id="s1" class="status"></span>
+    </div>
+
+    <!-- 2) 단건 조회 -->
+    <div class="card">
+      <h2><span class="badge b-get">GET</span>② 하나만 보기</h2>
+      <p class="hint">GET <span class="ep" data-tail="/{id}">/api/guestbook/{id}</span></p>
+      <label>번호(id)</label>
+      <input id="getId" value="1" />
+      <button class="b-get" onclick="getOne()">불러오기</button>
+      <span id="s2" class="status"></span>
+    </div>
+
+    <!-- 3) 생성 -->
+    <div class="card">
+      <h2><span class="badge b-post">POST</span>③ 새 글 남기기</h2>
+      <p class="hint">POST <span class="ep" data-tail="/">/api/guestbook/</span></p>
+      <div class="row">
+        <div><label>이름</label><input id="cWriter" value="아이닷" oninput="syncBody('c')" /></div>
+        <div><label>한마디</label><input id="cMessage" value="반갑습니다!" oninput="syncBody('c')" /></div>
+      </div>
+      <label>보낼 내용 (JSON — 직접 고쳐도 됩니다)</label>
+      <textarea id="cBody" rows="3">{ "writer": "아이닷", "message": "반갑습니다!" }</textarea>
+      <button class="b-post" onclick="createOne()">글 남기기</button>
+      <span id="s3" class="status"></span>
+    </div>
+
+    <!-- 4) 수정 -->
+    <div class="card">
+      <h2><span class="badge b-put">PUT</span>④ 글 고치기</h2>
+      <p class="hint">PUT <span class="ep" data-tail="/{id}">/api/guestbook/{id}</span></p>
+      <div class="row">
+        <div><label>번호(id)</label><input id="uId" value="1" /></div>
+        <div><label>이름</label><input id="uWriter" value="아이닷" oninput="syncBody('u')" /></div>
+        <div><label>한마디</label><input id="uMessage" value="내용을 고쳐 봤어요" oninput="syncBody('u')" /></div>
+      </div>
+      <label>보낼 내용 (JSON)</label>
+      <textarea id="uBody" rows="3">{ "writer": "아이닷", "message": "내용을 고쳐 봤어요" }</textarea>
+      <button class="b-put" onclick="updateOne()">고치기</button>
+      <span id="s4" class="status"></span>
+    </div>
+
+    <!-- 5) 삭제 -->
+    <div class="card">
+      <h2><span class="badge b-del">DELETE</span>⑤ 글 지우기</h2>
+      <p class="hint">DELETE <span class="ep" data-tail="/{id}">/api/guestbook/{id}</span></p>
+      <label>번호(id)</label>
+      <input id="dId" value="2" />
+      <button class="b-del" onclick="removeOne()">지우기</button>
+      <span id="s5" class="status"></span>
+    </div>
+
+    <!-- 응답 -->
+    <div class="card">
+      <h2>서버가 보낸 답 (응답)</h2>
+      <p class="hint" id="lastReq">아직 요청을 보내지 않았어요.</p>
+      <pre id="out">여기에 결과가 나옵니다.</pre>
+    </div>
+  </div>
+
+  <!-- SSE -->
+  <div class="card">
+    <h2>⑥ 실시간 알림 받기 (SSE)</h2>
+    <p class="hint">
+      서버가 먼저 말을 거는 방식이에요. [연결] 을 누른 뒤 위에서 <b>글을 남기거나 지워</b> 보세요 —
+      방명록이 바뀔 때마다 서버가 알려 줍니다. 이 페이지를 두 개 열어 두면 양쪽에 동시에 나타나요.
+      · GET /api/events/stream?channel=guestbook · POST /api/events/publish
+    </p>
+    <div class="row">
+      <div>
+        <label>채널 이름</label>
+        <input id="sseChannel" value="guestbook" />
+      </div>
+      <div>
+        <label>보낼 메시지</label>
+        <input id="sseMsg" value="안녕하세요!" />
+      </div>
+    </div>
+    <button class="b-post" id="sseBtn" onclick="toggleSse()">연결</button>
+    <button class="b-gray" onclick="publish()">메시지 보내기</button>
+    <button class="b-gray" onclick="clearLog()">지우기</button>
+    <span class="status"><span class="dot off" id="sseDot"></span><span id="sseState">끊김</span></span>
+    <div class="log" id="sseLog" style="margin-top:12px"></div>
+  </div>
+</main>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  const baseUrl  = () => el('baseUrl').value.trim().replace(/\/$/, '');
+  const basePath = () => el('basePath').value.trim().replace(/\/$/, '') || '/api/guestbook';
+
+  /* ★ v1.29.1 — 기본 경로를 바꾸면 **위의 안내 문구도 같이** 바뀌어야 한다.
+     예전에는 실제 호출만 basePath() 를 따르고 문구는 /api/guestbook 으로 박혀 있어서,
+     `/api/snack` 으로 바꿔 놓고도 "GET /api/guestbook/" 이 보였다.
+     어디로 가는지 화면이 거짓말을 하면 따라 하는 사람이 헷갈린다. */
+  function syncEndpointHints() {
+    const base = basePath();
+    const qs = queryString();
+    const suffix = qs ? '?' + qs : '';
+    document.querySelectorAll('.ep').forEach((n) => { n.textContent = base + (n.dataset.tail || '') + suffix; });
+    document.querySelectorAll('.ep-base').forEach((n) => { n.textContent = base; });
+  }
+  el('basePath').addEventListener('input', syncEndpointHints);
+  el('queryParams').addEventListener('input', syncEndpointHints);
+  syncEndpointHints();
+  /** 적어 둔 요청 파라미터를 주소 뒤에 붙인다.
+   *  · `?a=1&b=2` · `a=1&b=2` 어느 쪽으로 적어도 받는다
+   *  · 경로에 이미 `?` 가 있으면 `&` 로 잇는다
+   *  · 값에 한글·공백이 있어도 되도록 인코딩한다 */
+  function queryString() {
+    const raw = el('queryParams').value.trim().replace(/^[?&]+/, '');
+    if (!raw) return '';
+    const parts = [];
+    for (const pair of raw.split('&')) {
+      if (!pair) continue;
+      const i = pair.indexOf('=');
+      const k = (i < 0 ? pair : pair.slice(0, i)).trim();
+      const v = i < 0 ? '' : pair.slice(i + 1).trim();
+      if (k) parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+    }
+    return parts.join('&');
+  }
+
+  const url = (p) => {
+    const qs = queryString();
+    if (!qs) return baseUrl() + p;
+    return baseUrl() + p + (p.includes('?') ? '&' : '?') + qs;
+  };
+
+  /** 요청을 보내고 결과를 화면에 표시하는 공통 함수 */
+  async function call(method, path, body, statusId) {
+    const full = url(path);
+    el('lastReq').textContent = `${method} ${full}` + (body ? `   ·   보낸 내용: ${JSON.stringify(body)}` : '');
+    const st = statusId ? el(statusId) : null;
+    if (st) { st.textContent = '보내는 중…'; st.className = 'status'; }
+    const t0 = performance.now();
+    try {
+      const res = await fetch(full, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      let shown = text;
+      try { shown = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+      el('out').textContent = shown;
+      const ms = Math.round(performance.now() - t0);
+      if (st) {
+        st.textContent = `${res.status} ${res.statusText} · ${ms}ms`;
+        st.className = 'status ' + (res.ok ? 'ok' : 'err');
+      }
+      return res;
+    } catch (e) {
+      el('out').textContent = '요청 실패: ' + e.message +
+        '\n\n· 서버가 켜져 있는지 (npm start)\n· Base URL 이 맞는지\n· 다른 PC 라면 CORS_ORIGIN 설정을 확인하세요.';
+      if (st) { st.textContent = '실패'; st.className = 'status err'; }
+    }
+  }
+
+  const listAll   = () => call('GET',    basePath() + '/', null, 's1');
+  const getOne    = () => call('GET',    basePath() + '/' + encodeURIComponent(el('getId').value), null, 's2');
+  const removeOne = () => call('DELETE', basePath() + '/' + encodeURIComponent(el('dId').value), null, 's5');
+
+  /** 입력칸을 고치면 아래 JSON 칸을 다시 만들어 준다 (prefix: 'c' = 생성, 'u' = 수정) */
+  function syncBody(prefix) {
+    const writer = el(prefix + 'Writer').value;
+    const message = el(prefix + 'Message').value;
+    el(prefix + 'Body').value = JSON.stringify({ writer, message }, null, 1).replace(/\n\s*/g, ' ');
+  }
+
+  /** JSON 칸을 읽어 온다. 형식이 잘못되면 화면에 알려 준다. */
+  function readBody(prefix, statusId) {
+    try {
+      return JSON.parse(el(prefix + 'Body').value);
+    } catch (e) {
+      el('out').textContent = 'JSON 형식이 잘못됐어요: ' + e.message +
+        '\n\n{ "writer": "이름", "message": "한마디" } 처럼 큰따옴표를 꼭 써야 합니다.';
+      const st = el(statusId); st.textContent = 'JSON 오류'; st.className = 'status err';
+      return null;
+    }
+  }
+
+  function createOne() {
+    const body = readBody('c', 's3');
+    if (body) call('POST', basePath() + '/', body, 's3');
+  }
+  function updateOne() {
+    const body = readBody('u', 's4');
+    if (body) call('PUT', basePath() + '/' + encodeURIComponent(el('uId').value), body, 's4');
+  }
+
+  /* ── SSE ───────────────────────────────────────────── */
+  let es = null;
+
+  function logLine(text, color) {
+    const div = document.createElement('div');
+    const t = new Date().toLocaleTimeString('ko-KR');
+    div.innerHTML = `<time>${t}</time><span style="color:${color || '#1F2437'}">${text}</span>`;
+    const box = el('sseLog');
+    box.prepend(div);
+    while (box.childElementCount > 200) box.lastElementChild.remove();
+  }
+  const clearLog = () => { el('sseLog').innerHTML = ''; };
+
+  function setState(on, text) {
+    el('sseDot').className = 'dot ' + (on ? 'on' : 'off');
+    el('sseState').textContent = text;
+    el('sseBtn').textContent = es ? '연결 끊기' : '연결';
+  }
+
+  function toggleSse() {
+    if (es) { es.close(); es = null; setState(false, '끊김'); logLine('연결을 끊었습니다.', '#6B7280'); return; }
+    const ch = encodeURIComponent(el('sseChannel').value || 'demo');
+    es = new EventSource(url('/api/events/stream?channel=' + ch));
+    setState(false, '연결 중…');
+
+    es.onopen = () => { setState(true, '연결됨'); logLine('서버와 연결되었습니다.', '#12A150'); };
+    es.onerror = () => {
+      setState(false, '재접속 중…');
+      logLine('연결이 끊겼습니다. 브라우저가 자동으로 다시 붙습니다…', '#F96167');
+    };
+    // 이름 없는 기본 이벤트
+    es.onmessage = (e) => {
+      const d = safeParse(e.data);
+      logLine(`<b>메시지</b> (id=${e.lastEventId}) ${d.message ?? e.data}`, '#3B5BDB');
+    };
+    // 서버가 event: 이름을 붙여 보낸 것들
+    ['hello', 'connected', 'guestbook', 'server-shutdown'].forEach((name) => {
+      es.addEventListener(name, (e) => {
+        const d = safeParse(e.data);
+        if (name === 'guestbook') {
+          logLine(`<b>방명록 ${d.action}</b> id=${d.id ?? '?'} ${d.writer ? d.writer + ': ' + d.message : ''}`, '#12A150');
+        } else {
+          logLine(`<b>${name}</b> ${d.message ?? JSON.stringify(d)}`, '#6B7280');
+        }
+      });
+    });
+    setState(false, '연결 중…');
+  }
+
+  function safeParse(t) { try { return JSON.parse(t); } catch { return { message: t }; } }
+
+  async function publish() {
+    const body = { channel: el('sseChannel').value || 'demo', message: el('sseMsg').value || '(빈 메시지)' };
+    const res = await fetch(url('/api/events/publish'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = await res.json().catch(() => null);
+    logLine(`보냄 → ${body.message}  (받은 사람 ${j?.data?.delivered ?? '?'}명)`, '#C77700');
+  }
+</script>
+</body>
+</html>

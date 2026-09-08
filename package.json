@@ -1,0 +1,209 @@
+{
+  "name": "aidot-express",
+  "version": "1.41.3",
+  "description": "Spring Boot 스타일 Node.js + Express 웹서버",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "start:server": "node --import ./src/loader/register.mjs src/supervisor.js",
+    "start:main": "node --import ./src/loader/register.mjs src/app.js",
+    "dev": "node --watch --import ./src/loader/register.mjs src/app.js",
+    "check": "node --experimental-vm-modules --no-warnings scripts/check-syntax.mjs && npm run check:refs && npm run check:self && npm run check:sqlnames",
+    "test": "node --import ./src/loader/register.mjs --test \"tests/**/*.test.mjs\"",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:sse": "node scripts/sse-check.mjs",
+    "test:electron": "node scripts/electron-smoke.cjs",
+    "release": "node scripts/release.mjs",
+    "mci:mock": "node mci-server/index.js",
+    "electron:dev": "node scripts/electron-dev.cjs",
+    "electron:dev:vite": "node scripts/electron-dev-vite.cjs",
+    "build:admin": "cd admin-client && npx vite build --config vite.public.js",
+    "build:electron": "npm run ensure:deps && npm run build:admin && electron-builder",
+    "dist:win": "npm run ensure:deps && npm run build:admin && node scripts/build-edition.mjs",
+    "dist:win:ia32": "npm run build:admin && electron-builder --win --ia32 --x64",
+    "pack": "electron-builder --dir",
+    "check:vue": "python3 scripts/check-vue-trace.py",
+    "check:sfc": "node scripts/check-sfc.mjs",
+    "check:render": "node scripts/check-render.mjs",
+    "check:ui": "npm run check:vue && npm run check:sfc && npm run check:i18n && npm run check:render",
+    "logs": "node scripts/logs.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:env": "node scripts/verify-env.mjs",
+    "mci:drill": "node scripts/mci-drill.mjs",
+    "mci:gen-check": "node scripts/mci-gen-check.mjs",
+    "tutorial:check": "node scripts/tutorial-check.mjs",
+    "logs:check": "node scripts/logs-trace-check.mjs",
+    "ui:check": "node scripts/console-ui-check.mjs",
+    "backup:check": "node scripts/backup-secure-check.mjs",
+    "scenario:check": "node scripts/scenario-check.mjs",
+    "screen:check": "node scripts/screen-designer-check.mjs",
+    "trace:check": "node scripts/trace-tutorial-check.mjs",
+    "control:check": "node scripts/control-users-check.mjs",
+    "metrics:check": "node scripts/metrics-openapi-check.mjs",
+    "mci:incident": "node --import ./src/loader/register.mjs scripts/mci-incident-drill.mjs",
+    "ha:drill": "node scripts/ha-drill.mjs",
+    "ha:witness": "node scripts/ha-witness.mjs",
+    "ha:scenarios": "node scripts/ha-scenarios.mjs",
+    "ha:lab": "bash scripts/ha-lab.sh",
+    "ha:tutorial": "python3 docs/tutorial-src/build-ha-tutorial.py docs/aidot-express-ha-tutorial.pptx",
+    "check:refs": "node scripts/check-vue-refs.mjs",
+    "check:self": "node scripts/check-self-calls.mjs",
+    "check:sqlnames": "node scripts/check-sql-names.mjs",
+    "check:kr": "node scripts/check-i18n-hardcoded.mjs",
+    "i18n:extract": "node scripts/i18n-extract.mjs",
+    "smoke": "node scripts/smoke-screens.mjs",
+    "dist:linux": "npm run ensure:deps && npm run build:admin && node scripts/build-edition.mjs --linux",
+    "dist:all": "npm run dist:win && node scripts/build-edition.mjs --linux",
+    "push": "node scripts/git-push.mjs",
+    "release:github": "node scripts/git-release.mjs",
+    "license:report": "npx --yes license-checker --summary",
+    "ensure:deps": "node scripts/ensure-build-deps.mjs",
+    "sync:public": "node scripts/publish/sync-public.mjs",
+    "dist:win:full": "npm run ensure:deps && npm run build:admin && node scripts/build-edition.mjs --full",
+    "dist:linux:full": "npm run ensure:deps && npm run build:admin && node scripts/build-edition.mjs --linux --full",
+    "all": "node scripts/release-all.mjs",
+    "build:admin:full": "cd admin-client && npm run build",
+    "tut:extract": "node scripts/tutorial/extract-text.mjs",
+    "tut:apply": "node scripts/tutorial/apply-text.mjs",
+    "tut:check": "node scripts/tutorial/check-overflow.mjs"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "argon2": "^0.45.1",
+    "axios": "^1.19.0",
+    "better-sqlite3": "^13.0.3",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "esbuild": "^0.28.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mariadb": "^3.5.3",
+    "morgan": "^1.11.0",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.6.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.aidot.express",
+    "productName": "Aidot Express",
+    "copyright": "Copyright © 2026 Aidot",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "electron/build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "workspace/**/*",
+      "lib/**/*",
+      "admin-client/dist/**/*",
+      "public/**/*",
+      "docs/**/*",
+      "legacy/**/*",
+      "mci-server/**/*",
+      "package.json",
+      "!**/*.{ts,tsx,map}",
+      "!src/**/meta/**",
+      "!admin-client/src/**",
+      "!admin-client/node_modules/**",
+      "!tests/**",
+      "!**/.env*",
+      ".env.example",
+      "!**/*.test.{js,mjs}",
+      "!**/README.md",
+      "!scripts/**",
+      "!tests/**",
+      "!.tmp/**",
+      "!data/**",
+      "!examples/**",
+      "!mci-server/samples/**"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/build/icon.ico",
+        "to": "electron/build/icon.ico"
+      },
+      {
+        "from": "electron/build/tray.png",
+        "to": "electron/build/tray.png"
+      }
+    ],
+    "asar": false,
+    "asarUnpack": [
+      "**/node_modules/argon2/**",
+      "**/node_modules/mariadb/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Aidot Express",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "uninstallDisplayName": "Aidot Express ${version}",
+      "installerIcon": "electron/build/icon.ico",
+      "uninstallerIcon": "electron/build/icon.ico",
+      "installerHeaderIcon": "electron/build/icon.ico",
+      "include": "electron/build/installer.nsh",
+      "warningsAsErrors": false,
+      "differentialPackage": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "electron/build/icon.png",
+      "category": "Development"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "electron/build/icon.png",
+      "category": "public.app-category.developer-tools"
+    }
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mike-jung/aidot-express.git"
+  },
+  "homepage": "https://github.com/mike-jung/aidot-express#readme",
+  "bugs": {
+    "url": "https://github.com/mike-jung/aidot-express/issues"
+  },
+  "author": "Aidot Link Co., Ltd. <mike.jung.global@gmail.com>"
+}

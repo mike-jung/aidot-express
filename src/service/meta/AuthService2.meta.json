@@ -1,0 +1,30 @@
+{
+  "name": "AuthService2",
+  "sqlFile": "auth",
+  "description": "",
+  "methods": [
+    {
+      "name": "signup",
+      "type": "custom"
+    },
+    {
+      "name": "login",
+      "type": "custom"
+    },
+    {
+      "name": "rotate",
+      "type": "custom"
+    },
+    {
+      "name": "logout",
+      "type": "custom"
+    },
+    {
+      "name": "logoutAll",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.924Z",
+  "_version": 2
+}

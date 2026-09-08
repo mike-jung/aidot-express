@@ -1,0 +1,23 @@
+{
+  "name": "BloodPressureController",
+  "basePath": "/api/bp",
+  "serviceName": "BloodPressureService",
+  "description": "혈압 기록·목표 관리 (aidot-express 변환본, 페이지네이션 + 구 경로 하위 호환 포함)",
+  "auth": false,
+  "roles": [],
+  "routes": [
+    { "type": "list",      "method": "get",    "path": "/records",        "handlerName": "list",            "auth": false, "roles": [] },
+    { "type": "listPaged", "method": "get",    "path": "/records/paged",  "handlerName": "listPaged",       "auth": false, "roles": [] },
+    { "type": "getById",   "method": "get",    "path": "/records/:id",    "handlerName": "get",             "auth": false, "roles": [] },
+    { "type": "custom",    "method": "post",   "path": "/records/add",    "handlerName": "addLegacy",       "auth": false, "roles": [] },
+    { "type": "create",    "method": "post",   "path": "/records",        "handlerName": "create",          "auth": false, "roles": [] },
+    { "type": "custom",    "method": "post",   "path": "/records/update", "handlerName": "updateLegacy",    "auth": false, "roles": [] },
+    { "type": "updateById","method": "put",    "path": "/records/:id",    "handlerName": "update",          "auth": false, "roles": [] },
+    { "type": "custom",    "method": "post",   "path": "/records/delete", "handlerName": "removeLegacy",    "auth": false, "roles": [] },
+    { "type": "remove",    "method": "delete", "path": "/records/:id",    "handlerName": "remove",          "auth": false, "roles": [] },
+    { "type": "list",      "method": "get",    "path": "/goals",          "handlerName": "listGoals",       "auth": false, "roles": [] },
+    { "type": "custom",    "method": "post",   "path": "/goals/update",   "handlerName": "saveGoalsLegacy", "auth": false, "roles": [] },
+    { "type": "custom",    "method": "put",    "path": "/goals",          "handlerName": "saveGoals",       "auth": false, "roles": [] }
+  ],
+  "_version": 1
+}

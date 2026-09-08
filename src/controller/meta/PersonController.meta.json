@@ -1,0 +1,27 @@
+{
+  "name": "PersonController",
+  "basePath": "/api/person",
+  "serviceName": "PersonService",
+  "description": "Person 컨트롤러 테스트",
+  "auth": true,
+  "roles": [],
+  "routes": [
+    {
+      "type": "list",
+      "method": "get",
+      "path": "/",
+      "handlerName": "list",
+      "auth": true,
+      "roles": [],
+      "expanded": false,
+      "_showServices": false,
+      "_showSqls": false,
+      "_svcPickerOpen": false,
+      "_sqlPickerOpen": false,
+      "_serviceMethods": [],
+      "_sqlQueries": []
+    }
+  ],
+  "_generatedAt": "2026-04-18T01:05:32.597Z",
+  "_version": 1
+}

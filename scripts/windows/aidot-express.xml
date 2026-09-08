@@ -1,0 +1,48 @@
+<!--
+  aidot-express Windows 서비스 정의 (WinSW)
+
+  왜 서비스로 올리나
+    Electron 창 안에서 서버를 띄우면, 창을 닫거나 Electron 이 죽는 순간 서버도 같이 사라진다.
+    서비스로 올리면 OS(SCM) 가 서버를 관리한다 — 로그인 전에도 뜨고, 죽으면 OS 가 되살린다.
+    Electron 은 "보는 창" 일 뿐이다.
+
+  자동 재실행 (두 겹)
+    1) 프로세스 안: supervisor + watchdog 가 메인 서버를 되살린다 (3초 안에)
+    2) 프로세스 밖: supervisor 자체가 죽으면 아래 <onfailure> 로 OS 가 되살린다
+-->
+<service>
+  <id>aidot-express</id>
+  <name>Aidot Express</name>
+  <description>Aidot Express 서버 (Node.js). 크래시 시 OS 가 자동으로 다시 시작합니다.</description>
+
+  <!-- 설치 위치 기준. install-service.ps1 이 %BASE% 를 실제 경로로 채운다 -->
+  <executable>%BASE%\node\node.exe</executable>
+  <arguments>src\supervisor.js</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <env name="NODE_ENV" value="production"/>
+  <env name="AIDOT_ENV_FILE" value="%BASE%\.env"/>
+
+  <!-- ★ 실패 시 1분 후 다시 시작 — 세 번까지. 그 뒤에도 실패하면 리셋 주기(하루) 뒤 다시 센다 -->
+  <onfailure action="restart" delay="1 min"/>
+  <onfailure action="restart" delay="1 min"/>
+  <onfailure action="restart" delay="1 min"/>
+  <resetfailure>1 day</resetfailure>
+
+  <!-- 자동 시작 · 지연 시작(DB 서비스가 먼저 뜨도록) -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+
+  <!-- MariaDB 서비스가 있으면 그 뒤에 뜨도록 (없어도 무방) -->
+  <depend>MariaDB</depend>
+
+  <!-- 로그: 서비스 로그는 log\service\ 에, 회전 -->
+  <logpath>%BASE%\log\service</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+
+  <!-- 중지 시 SIGTERM 대신 Ctrl+C 계열 종료 신호를 준다 (supervisor 가 자식을 정리할 시간) -->
+  <stoptimeout>20 sec</stoptimeout>
+</service>

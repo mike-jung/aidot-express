@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Aidot Express</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: transparent;
+      height: 100%; width: 100%;
+      overflow: hidden;
+      font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    .shell {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: linear-gradient(135deg, #1f2f5a 0%, #273470 100%);
+      color: #fff;
+      padding: 38px 56px 34px;
+      border-radius: 18px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      min-width: 360px;
+      animation: pop .25s ease-out;
+    }
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(10px) scale(.96); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+    .logo {
+      font-size: 44px;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+    .version {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      margin-bottom: 22px;
+    }
+    .spinner-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 13px;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <div class="logo">⚡</div>
+      <h1>Aidot Express</h1>
+      <div class="version">서버를 준비하는 중</div>
+      <div class="spinner-row">
+        <div class="spinner"></div>
+        <span>잠시만 기다려주세요...</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "BloodPressureService",
+  "sqlFile": "bloodPressure",
+  "description": "혈압 기록·목표 서비스 (aidot-express 변환본)",
+  "methods": [
+    "list",
+    "listPaged",
+    "getById",
+    "create",
+    "update",
+    "remove",
+    "listGoals",
+    "saveGoals"
+  ],
+  "multiSqlMethods": [],
+  "_version": 1
+}

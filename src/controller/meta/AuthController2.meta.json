@@ -1,0 +1,56 @@
+{
+  "name": "AuthController2",
+  "basePath": "/api/auth2",
+  "controllerType": "DB",
+  "serviceName": "AuthService2",
+  "description": "",
+  "auth": true,
+  "roles": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/signup",
+      "handler": "signup",
+      "handlerName": "signup",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/login",
+      "handler": "login",
+      "handlerName": "login",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/refresh",
+      "handler": "refresh",
+      "handlerName": "refresh",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/logout",
+      "handler": "logout",
+      "handlerName": "logout",
+      "type": "custom"
+    },
+    {
+      "method": "POST",
+      "path": "/logout-all",
+      "handler": "logoutAll",
+      "handlerName": "logoutAll",
+      "type": "custom"
+    },
+    {
+      "method": "GET",
+      "path": "/me",
+      "handler": "me",
+      "handlerName": "me",
+      "type": "custom"
+    }
+  ],
+  "generatedFrom": "source-scan",
+  "_generatedAt": "2026-09-06T00:16:06.925Z",
+  "_version": 2
+}

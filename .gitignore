@@ -1,0 +1,19 @@
+node_modules
+log
+data
+.env
+.env.*.local
+.cache
+.tmp
+dist-electron
+src/secure/.keyguard.json
+.DS_Store
+Thumbs.db
+
+# Vue 예제의 빌드 산출물/의존성
+examples/**/node_modules
+examples/**/dist
+
+# generated per-edition build config
+.electron-builder.*.json
+.wsl-build.sh
