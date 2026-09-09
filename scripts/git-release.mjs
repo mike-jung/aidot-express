@@ -8,7 +8,7 @@
  *    npm run dist:all      둘 다
  *
  *  ⚠ `-full` 이 붙은 설치 파일은 올리지 않습니다. 공개 릴리스이기 때문입니다.
- *    (정말 필요하면 --allow-full 을 주지만, 그때도 5초간 확인을 요구합니다)
+ *    (Enterprise 업로드는 --to-full --allow-full 과 실제 private 저장소 확인이 필요합니다)
  *
  *  .env: GITHUB_TOKEN · PUBLIC_REPO (릴리스가 가는 곳) · GITHUB_REPO (--to-full 일 때)
  *  태그는 package.json 의 version 을 씁니다 — v1.32.0 처럼.
@@ -42,16 +42,15 @@ const token = env.GITHUB_TOKEN || env.GH_TOKEN;
  *  --to-full 을 주면 사내 배포용으로 full 저장소에 올릴 수 있다.
  */
 const toFull = process.argv.slice(2).includes('--to-full');
-const repo = toFull ? env.GITHUB_REPO : (env.PUBLIC_REPO || env.GITHUB_REPO);
+const repo = toFull ? env.GITHUB_REPO : env.PUBLIC_REPO;
+if (allowFull && !toFull) throw new Error('--allow-full requires --to-full and a private repository');
+if (repo && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error('Invalid repository name');
 
 if (!token || !repo) {
   console.error(`✗ .env needs GITHUB_TOKEN and ${toFull ? 'GITHUB_REPO' : 'PUBLIC_REPO'}.`);
   process.exit(1);
 }
-if (!toFull && !env.PUBLIC_REPO) {
-  console.log('⚠ PUBLIC_REPO is not set — uploading to GITHUB_REPO instead.');
-  console.log('  Releases normally go to the public repository — set PUBLIC_REPO in .env.');
-}
+
 console.log(`Release target: ${repo}${toFull ? '  (--to-full · internal)' : '  (public repository)'}`);
 
 const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -92,7 +91,8 @@ const isFull = (f) => /-full[-.]/i.test(f);
  *
  *  전자 빌더가 파일 이름에 버전을 넣으므로(artifactName), 이름으로 거른다.
  */
-const forThisVersion = (f) => f.includes(version);
+const versionPattern = new RegExp(`(?:^|-)${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=-|\\.(?:exe|AppImage|deb|rpm|zip|dmg|tar\\.gz)$)`, 'i');
+const forThisVersion = (f) => versionPattern.test(f);
 const stale = all.filter((f) => !forThisVersion(f));
 const fullOnes = all.filter((f) => forThisVersion(f) && isFull(f));
 
@@ -113,16 +113,25 @@ if (fullOnes.length && !allowFull) {
   for (const f of fullOnes) console.log(`    ${f}`);
   console.log('  If someone needs the full edition, hand them the file directly.');
 }
-if (fullOnes.length && allowFull) {
-  console.log('\n⚠⚠ --allow-full is on. The installers below **contain enterprise features**:');
-  for (const f of fullOnes) console.log(`    ${f}`);
-  console.log('  Are you sure you want these in the public repository? If not, press Ctrl+C now. (5s)');
-  await new Promise((r) => setTimeout(r, 5000));
-}
 if (!assets.length) {
-  console.error(`✗ no installers to upload in ${distDir}.`);
-  console.error('  What is in that folder:', fs.readdirSync(distDir).slice(0, 10).join(', ') || '(비어 있음)');
-  console.error('  Check that npm run dist:win completed successfully.');
+  /* ★ v1.41.4 — **왜** 없는지 말해 준다.
+     "설치 파일이 없다" 만 보면 빌드가 깨진 줄 알지만, 대개는 원인이 다르다:
+     package.json 을 올린 뒤 다시 빌드하지 않아 **옛 버전 파일만 남은 것**이다.
+     실제로 그 상황을 에러로 오해한 적이 있다. 무엇을 하면 되는지까지 적는다. */
+  const inFolder = fs.readdirSync(distDir);
+  const installers = inFolder.filter((f) => /\.(exe|AppImage|dmg|deb|tar\.gz)$/i.test(f));
+
+  if (installers.length) {
+    console.error(`✗ ${distDir} has installers, but none for v${version}.`);
+    console.error(`  Found: ${installers.join(', ')}`);
+    console.error(`  These were built from an earlier version. Build this one first:`);
+    console.error('     npm run dist:win        (or dist:linux · dist:all)');
+    console.error('  Or run everything in order:  npm run all');
+  } else {
+    console.error(`✗ no installers in ${distDir}.`);
+    console.error(`  What is in that folder: ${inFolder.slice(0, 10).join(', ') || '(empty)'}`);
+    console.error('  Build first:  npm run dist:win');
+  }
   process.exit(1);
 }
 
@@ -142,6 +151,11 @@ const api = async (url, init = {}) => {
   if (!r.ok) throw new Error(`${r.status} ${await r.text().catch(() => '')}`.slice(0, 200));
   return r.json();
 };
+
+if (toFull || allowFull) {
+  const targetRepository = await api(`https://api.github.com/repos/${repo}`);
+  if (targetRepository.private !== true) throw new Error('Enterprise releases require a verified private repository');
+}
 
 /**
  * ★ v1.33.4 — 릴리스 설명을 CHANGELOG 에서 만든다.
@@ -211,7 +225,7 @@ try {
         + `\n\n**Linux** — \`.AppImage\`: make it executable and run it.`
         + `\n\n\`\`\`bash\nchmod +x 'Aidot Express-${version}.AppImage'\n./'Aidot Express-${version}.AppImage'\n\`\`\``
         + `\n\n\`.tar.gz\`: unpack it and run the binary inside.`
-        + `\n\nThe console opens at http://localhost:7901 — sign in with admin / admin1234 and change it.`
+        + `\n\nThe console opens at http://localhost:7901. Use your configured initial credentials and complete the required password change.`
         + ` \`.tar.gz\` 는 풀어서 안의 실행 파일을 실행`,
       /* 초안으로 만든다 — 내용을 확인하고 사이트에서 Publish 를 눌러야 공개된다.
          잘못 올린 릴리스를 되돌리는 것보다, 한 번 보고 내보내는 편이 안전하다. */

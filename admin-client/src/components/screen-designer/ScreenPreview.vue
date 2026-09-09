@@ -2,8 +2,6 @@
 import { useAuthStore } from '../../stores/auth';
 import { useI18n } from '../../composables/useI18n';
 
-const { t } = useI18n();
-const auth = useAuthStore();
 /**
  * ScreenPreview — Composite 화면을 iframe 으로 라이브 프리뷰.
  *
@@ -16,6 +14,9 @@ const auth = useAuthStore();
  */
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { buildCompositePreviewDoc } from '../../generator/screens/compositePreviewBuilder';
+
+const { t } = useI18n();
+const auth = useAuthStore();
 
 const props = defineProps({
   spec: { type: Object, required: true },

@@ -16,9 +16,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from '../composables/useI18n';
 
-const { t } = useI18n();
 import ApiCallForm from './ApiCallForm.vue';
 import { useDraggable } from '../composables/useDraggable';
+
+const { t } = useI18n();
 
 const { modalRef, headerRef } = useDraggable();
 

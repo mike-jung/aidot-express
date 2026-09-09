@@ -56,7 +56,7 @@ const run = (cmd, cmdArgs, opts = {}) =>
 /* ── ① Linux 에서는 그냥 만든다 ─────────────────────────────────── */
 function buildNative() {
   console.log('▶ Building on Linux (AppImage)');
-  run('npx', ['electron-builder', '--linux', '--x64', ...cfgArgs]);
+  run('npx', ['electron-builder', '--linux', '--x64', '--publish', 'never', ...cfgArgs]);
 }
 
 /* ── ② WSL2 ──────────────────────────────────────────────────────
@@ -113,9 +113,9 @@ function buildWsl() {
     `fi`,
     `cd ${workDir}`,
     'echo "▶ Linux 용 의존성 설치 (처음엔 몇 분 걸립니다)"',
-    'npm install --no-audit --no-fund',
+    'npm ci --no-audit --no-fund',
     'echo "▶ AppImage 빌드"',
-    `npx electron-builder --linux --x64${cfgArgs.length ? ' --config ' + path.basename(cfgArgs[1]) : ''}`,
+    `npx electron-builder --linux --x64 --publish never${cfgArgs.length ? ' --config ' + path.basename(cfgArgs[1]) : ''}`,
     /* 결과물만 Windows 쪽으로 돌려준다 */
     `mkdir -p "${wslSrc}/dist-electron"`,
     `cp -f dist-electron/*.AppImage "${wslSrc}/dist-electron/" 2>/dev/null || true`,
@@ -145,8 +145,8 @@ function buildDocker() {
   console.log('▶ Building inside Docker (electronuserland/builder)');
   const inner = [
     'set -e',
-    'npm install --no-audit --no-fund',
-    `npx electron-builder --linux --x64${cfgArgs.length ? ' --config ' + path.basename(cfgArgs[1]) : ''}`,
+    'npm ci --no-audit --no-fund',
+    `npx electron-builder --linux --x64 --publish never${cfgArgs.length ? ' --config ' + path.basename(cfgArgs[1]) : ''}`,
   ].join(' && ');
   run('docker', [
     'run', '--rm',
@@ -167,7 +167,7 @@ function buildDocker() {
 function buildTarGz() {
   console.log('▶ Building tar.gz instead of AppImage (works on Windows too)');
   console.log('  The recipient unpacks it and runs the executable inside.');
-  run('npx', ['electron-builder', '--linux', 'tar.gz', '--x64', ...cfgArgs]);
+  run('npx', ['electron-builder', '--linux', 'tar.gz', '--x64', '--publish', 'never', ...cfgArgs]);
 }
 
 /* ── 무엇으로 할지 고른다 ────────────────────────────────────────── */

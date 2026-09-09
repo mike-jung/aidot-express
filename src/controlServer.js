@@ -15,25 +15,25 @@
  *   GET  /api/control/health                   control 서버 자체 헬스체크 (인증 불필요)
  */
 import express from 'express';
-import cors from 'cors';
-import jwt from 'jsonwebtoken';
+import { originPolicy } from './core/originPolicy.js';
+import { assertCurrentAccount } from './core/accountState.js';
+import { verifyAccessToken } from './core/tokens.js';
+import db from './database/db.js';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import logger from './util/logger.js';
 import config from './config/index.js';
 
+let controlDbReady = null;
 const AUTH_HEADER_RE = /^Bearer\s+(.+)$/i;
 
 /** JWT 검증 미들웨어 — admin 역할만 허용 */
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const h = req.headers.authorization || '';
   const m = AUTH_HEADER_RE.exec(h);
   if (!m) return res.status(401).json({ code: 401, message: 'Authorization header required' });
   try {
-    const secret = config.auth.accessSecret;
-    const payload = jwt.verify(m[1], secret, {
-      algorithms: ['HS256'],
-      issuer: config.auth.issuer,
-      clockTolerance: 5,
-    });
+    const payload = verifyAccessToken(m[1]);
     // 관리자 콘솔 계정(realm='admin') 의 admin 역할만 — 일반 사용자 토큰(realm='user') 은 role 이 admin 이어도 거부
     if (payload.role !== 'admin' || (payload.realm && payload.realm !== 'admin')) {
       return res.status(403).json({ code: 403, message: 'Admin console account with admin role required' });
@@ -42,11 +42,17 @@ function authMiddleware(req, res, next) {
       // v1.2.0 이전 토큰(realm 없음) 은 user 로 간주 → 재로그인 필요
       return res.status(401).json({ code: 401, message: 'Token issued by older version. Please sign in again.' });
     }
+    if (db.getDbStatus().available !== true) {
+      controlDbReady ||= db.initDb().catch((error) => { controlDbReady = null; throw error; });
+      await controlDbReady;
+    }
+    await assertCurrentAccount(payload, { method: req.method, path: req.path });
     req.user = { id: Number(payload.sub), role: payload.role, username: payload.username };
     return next();
   } catch (e) {
-    return res.status(401).json({
-      code: 401,
+    const status = [401, 403, 503].includes(e.status) ? e.status : 401;
+    return res.status(status).json({
+      code: status,
       message: e.name === 'TokenExpiredError' ? 'Token expired' : 'Invalid token',
     });
   }
@@ -56,10 +62,12 @@ function authMiddleware(req, res, next) {
 export function createControlApp(sup) {
   const app = express();
 
-  // CORS (patch-16): credentials:true 와 origin:'*' 는 사양상 공존 불가.
-  //  origin:true 로 두면 요청의 Origin 헤더를 그대로 echo 하여 credentials 와 안전하게 함께 사용 가능.
-  //  control API 는 보통 같은 origin(admin SPA)에서만 호출되지만, 외부 도구로 호출하는 경우에도 안전하게.
-  app.use(cors({ origin: config.cors?.origin ?? true, credentials: true }));
+  app.disable('x-powered-by');
+  app.set('trust proxy', config.server.trustProxy ?? false);
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  app.use(originPolicy(config, { additionalOrigins: [`http://127.0.0.1:${config.server.port}`, `http://localhost:${config.server.port}`] }));
+  app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path === '/api/control/health' }));
   app.use(express.json({ limit: '1mb' }));
 
   // 헬스 체크 — 인증 불필요
@@ -81,7 +89,7 @@ export function createControlApp(sup) {
       res.json({ data: result });
     } catch (e) {
       logger.warn(`[control] START failed: ${e.message}`);
-      res.status(e.status || 500).json({ code: e.status || 500, message: e.message });
+      res.status(e.status || 500).json({ code: e.status || 500, message: config.env === 'production' && (!e.status || e.status >= 500) ? 'Internal Server Error' : e.message });
     }
   });
 
@@ -93,7 +101,7 @@ export function createControlApp(sup) {
       res.json({ data: result });
     } catch (e) {
       logger.warn(`[control] STOP failed: ${e.message}`);
-      res.status(e.status || 500).json({ code: e.status || 500, message: e.message });
+      res.status(e.status || 500).json({ code: e.status || 500, message: config.env === 'production' && (!e.status || e.status >= 500) ? 'Internal Server Error' : e.message });
     }
   });
 
@@ -106,7 +114,7 @@ export function createControlApp(sup) {
       res.json({ data: result });
     } catch (e) {
       logger.warn(`[control] RESTART failed: ${e.message}`);
-      res.status(e.status || 500).json({ code: e.status || 500, message: e.message });
+      res.status(e.status || 500).json({ code: e.status || 500, message: config.env === 'production' && (!e.status || e.status >= 500) ? 'Internal Server Error' : e.message });
     }
   });
 
@@ -118,8 +126,9 @@ export function createControlApp(sup) {
   // 전역 에러 핸들러
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
+    if (res.headersSent) return _next(err);
     logger.error(`[control] internal error: ${err.message}`);
-    res.status(err.status || 500).json({ code: err.status || 500, message: err.message });
+    res.status(err.status || 500).json({ code: err.status || 500, message: config.env === 'production' && (!err.status || err.status >= 500) ? 'Internal Server Error' : err.message });
   });
 
   return app;

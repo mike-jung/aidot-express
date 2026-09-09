@@ -26,7 +26,7 @@
  *    한국어 브라우저를 쓴다는 이유로 그 의도를 뒤집으면 안 됩니다.
  *    (사용자가 직접 고른 값은 여전히 맨 위입니다 — 개인 선택이 조직 기본을 이깁니다)
  */
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import en from '../locales/en.js';
 import ko from '../locales/ko.js';
 
@@ -62,6 +62,18 @@ function detect() {
 
 export const locale = ref(detect());
 
+/* ★ v1.42.0 — <html lang> 은 **locale 이 바뀔 때마다** 따라간다.
+   예전에는 setLocale() 안에서만 놓았다. 그래서
+     · English 를 저장해 둔 사람이 새로고침하면 index.html 의 lang="ko" 가 남고
+     · 서버 기본값(applyServerDefault)이 늦게 와도 반영되지 않았다.
+   <input type="datetime-local"> 같은 브라우저 기본 위젯은 이 속성으로 표기 언어를
+   정한다 — English 인데 날짜 칸이 한글이던 이유다. 실측: Chromium 은 OS 로캘이 아니라
+   lang 을 따른다. 한 곳에서 watch 하면 어느 경로로 바뀌든 빠지지 않는다. */
+const syncHtmlLang = (code) => { try { document.documentElement.setAttribute('lang', code); } catch { /* SSR */ } };
+syncHtmlLang(locale.value);
+watch(locale, syncHtmlLang);
+
+
 /**
  * 서버 기본값을 반영합니다.
  *  ⚠ 사용자가 이미 고른 값이 있으면 **바꾸지 않습니다.** 화면에서 고른 언어가
@@ -79,8 +91,6 @@ export function setLocale(code) {
   if (!supported(code)) return;
   locale.value = code;
   try { localStorage.setItem(STORAGE_KEY, code); } catch { /* 무시 */ }
-  // 스크린리더와 브라우저 번역기가 문서 언어를 읽습니다
-  try { document.documentElement.setAttribute('lang', code); } catch { /* SSR */ }
 }
 
 /** 사용자 선택을 지우고 서버/브라우저 기본으로 되돌립니다 */

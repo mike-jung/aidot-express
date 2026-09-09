@@ -1,5 +1,6 @@
 import { createServer, bootStatus, readiness } from './server.js';
 import config from './config/index.js';
+import { configureHttpServer } from './core/httpLimits.js';
 import logger from './util/logger.js';
 import db from './database/db.js';
 import { versionLine } from './util/version.js';
@@ -51,7 +52,7 @@ async function main() {
   const app = await createServer();
   const port = config.server.port;
 
-  const server = app.listen(port, () => {
+  const server = app.listen(port, config.server.host, () => {
     logger.info(`server started http://localhost:${port}  ${versionLine()}  (env=${config.env}, db=${db.currentAdapter()})`);
     printBootSummary(port);
     // Electron 으로 실행된 경우, 부모 프로세스에 ready 시그널 전송.
@@ -61,15 +62,19 @@ async function main() {
     }
   });
 
+  configureHttpServer(server, config.server);
+
   process.on('unhandledRejection', (reason) => {
     logger.error(reason instanceof Error ? reason : new Error(String(reason)));
+    shutdown('UNHANDLED_REJECTION', 1);
   });
   process.on('uncaughtException', (err) => {
     logger.error(err);
+    shutdown('UNCAUGHT_EXCEPTION', 1);
   });
 
   let shuttingDown = false;
-  const shutdown = (signal) => {
+  const shutdown = (signal, exitCode = 0) => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`${signal} received, stopping the server…`);
@@ -110,16 +115,20 @@ async function main() {
       } catch { /* noop */ }
       await db.closeDb();
       logger.info('server stopped');
-      process.exit(0);
+      process.exit(exitCode);
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('message', (message) => {
+    if (message?.type === 'aidot:shutdown') shutdown('PARENT_REQUEST');
+  });
+  process.on('disconnect', () => shutdown('PARENT_DISCONNECT'));
 
   // supervisor 가 강제 종료(SIGKILL) 되면 이 프로세스만 남아 포트를 계속 점유한다.
   //   POSIX 는 부모가 죽으면 ppid 가 1(init) 로 바뀌므로 이를 감시해 스스로 정리한다.
-  //   (Windows 는 supervisor 가 tree kill 을 사용하므로 이 감시가 필요 없다)
+  //   Windows와 IPC를 가진 실행에서는 disconnect 이벤트로 부모 종료를 감지한다.
   if (process.env.AIDOT_SUPERVISED === '1' && process.platform !== 'win32') {
     const parentPid = process.ppid;
     const watchdog = setInterval(() => {

@@ -1,3 +1,4 @@
+import { assertCurrentAccount } from './accountState.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -40,7 +41,6 @@ function traceFailures(res) {
 }
 import { verifyAccessToken, REALMS } from './tokens.js';
 import { isBlocked, blockInfo } from './blocklist.js';   // ★ v1.13.0
-import { isRevoked } from './revokedUsers.js';
 import sseHub from './sse.js';
 import { consumeTicket } from './sseTicket.js';
 import logger, { isAdminService } from '../util/logger.js';
@@ -183,6 +183,7 @@ function _buildRouter(Ctor, sourceFile = null) {
               username: payload.username,
               realm: payload.realm || REALMS.USER,
               iat: payload.iat,
+              ver: payload.ver ?? 0,
               exp: payload.exp,
             };
           } catch (e) {
@@ -194,10 +195,6 @@ function _buildRouter(Ctor, sourceFile = null) {
             ));
           }
           /* ★ v1.11.8 — 비활성/삭제된 계정의 토큰은 만료를 기다리지 않고 즉시 막는다 */
-          if (isRevoked(req.user.id, req.user.iat)) {
-            return res.status(401).json(buildErrorResponse(401, 'Account disabled. Please sign in again.',
-              mergeParams(req).requestCode, { errorCode: 'ACCOUNT_REVOKED' }));
-          }
           // realm 검사 — 토큰이 어느 계정 체계에서 발급됐는지
           const wantRealm = guard.realm ?? defaultRealm;
           const tokenRealm = req.user.realm;
@@ -211,6 +208,7 @@ function _buildRouter(Ctor, sourceFile = null) {
             return res.status(403).json(buildErrorResponse(403, 'Forbidden', mergeParams(req).requestCode));
           }
           }   // ← 티켓 분기의 else 끝
+          await assertCurrentAccount(req.user, { method: req.method, path: req.baseUrl + req.path });
         }
 
         // 2) params 병합

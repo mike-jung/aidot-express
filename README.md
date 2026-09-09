@@ -9,8 +9,8 @@ a browser console that writes the boilerplate for you,
 and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
-![Version](https://img.shields.io/badge/version-1.32.0-orange)
+![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
+![Version](https://img.shields.io/badge/version-1.43.2-orange)
 
 </div>
 
@@ -66,7 +66,8 @@ npm start
 ```
 
 Open **http://localhost:7901** and log in with `admin` / `admin1234`
-(change it immediately — the console will nag you until you do).
+(development only). Change the initial password before using protected console APIs.
+For production, set `ADMIN_INITIAL_PASSWORD` before the first start.
 
 ### Your first endpoint, in about a minute
 
@@ -96,7 +97,7 @@ admin-client/         the console (Vue 3)
 docs/                 tutorial deck, guides, licensing
 ```
 
-Upgrading is copying a zip over the top. `workspace/` and `.env` are yours and are
+For this release, follow [the current upgrade guide](docs/UPGRADE_1.43.2.md) before replacing files. `workspace/` and `.env` are yours and are
 never included in a release archive — that separation is deliberate.
 
 ---
@@ -131,18 +132,25 @@ restarts itself on crash, and the app attaches to it instead of starting a secon
 
 ---
 
+## Security and operation
+
+Read [Security operations](docs/SECURITY_OPERATIONS.md) for trusted origins, proxy
+settings, initial passwords, session revocation, HTTP limits and operational boundaries.
+Read [Architecture](docs/ARCHITECTURE.md) for the runtime and edition model.
+
 ## Verification
 
-Every release runs:
+Run these checks before a release:
 
 ```bash
 npm test          # unit and regression tests
-npm run check     # syntax, unresolved references, SQL name collisions, i18n keys
+npm run check     # syntax, unresolved references, SQL name collisions
+npm run check:security # security boundary and concurrency regressions
 npm run smoke     # opens every console screen in a real browser and checks for errors
 ```
 
-The smoke test exists because syntax checks kept passing while a screen was broken.
-If a screen fails to open, the build fails.
+The smoke test needs a browser runtime and a running test server. A successful
+syntax check does not replace browser, database, or installer testing.
 
 ---
 
@@ -159,8 +167,9 @@ edition rather than in this repository:
 | **Backup and restore** | Snapshot controllers, services and SQL to a zip and roll back to it. |
 | **Column encryption** | Store sensitive columns encrypted at rest, with key rotation. |
 
-The open edition in this repository is complete and production-ready on its own; the
-enterprise edition adds the pieces above rather than unlocking anything held back here.
+The public edition includes the core framework and console. Production deployments
+require environment-specific security and integration checks. Enterprise adds the
+capabilities listed above.
 
 **Contact:** mike.jung.global@gmail.com
 

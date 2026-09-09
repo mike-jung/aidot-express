@@ -16,12 +16,13 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { useI18n } from '../../composables/useI18n';
 
-const { t } = useI18n();
 import { storeToRefs } from 'pinia';
 import { useScreenProjectsStore } from '../../stores/screenProjects';
 import LayoutPicker from './LayoutPicker.vue';
 import LayoutCustomizer from './LayoutCustomizer.vue';
 import LayoutPreview from './LayoutPreview.vue';
+
+const { t } = useI18n();
 
 const store = useScreenProjectsStore();
 const { activeId, activeProject, saving } = storeToRefs(store);

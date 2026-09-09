@@ -1,3 +1,4 @@
+import { rotateToken, revokeRefreshFamily } from '../core/refreshRotation.js';
 /**
  * AuthService — 회원가입, 로그인, 토큰 회전(rotation), 로그아웃.
  *
@@ -189,9 +190,7 @@ export default class AuthService {
       this.log.error(
         `refresh token 재사용 감지 user=${rt.user_id} family=${rt.family_id} — family revoke`,
       );
-      await db.execute(this.authSql.get('revokeTokenFamily'), {
-        family_id: rt.family_id,
-      });
+      await revokeRefreshFamily(db, this.authSql, rt.family_id);
       throw Object.assign(
         new Error('Refresh token reuse detected. All sessions revoked.'),
         { status: 401 },
@@ -202,45 +201,12 @@ export default class AuthService {
       await db.execute(this.authSql.get('findUserById'), { id: rt.user_id })
     ).rows;
     const user = userRows[0];
-    if (!user || user.status !== 'active') {
+    if (!user || user.status !== 'active' || Number(rt.token_version ?? 0) !== Number(user.token_version ?? 0)) {
       throw Object.assign(new Error('User not available'), { status: 401 });
     }
 
-    return db.transaction(async (tx) => {
-      const newRt = createRefreshToken();
-      const insRes = await tx.execute(this.authSql.get('insertRefreshToken'), {
-        user_id: user.id,
-        token_hash: newRt.tokenHash,
-        family_id: rt.family_id, // 같은 family 유지
-        user_agent: meta.userAgent ?? null,
-        ip_address: meta.ip ?? null,
-        expires_at: newRt.expiresAt,
-      });
-      const newId = Number(insRes.insertId ?? 0);
+    return rotateToken(db, this.authSql, rt, user, meta, REALMS.USER);
 
-      await tx.execute(this.authSql.get('revokeRefreshToken'), {
-        id: rt.id,
-        replaced_by_id: newId,
-      });
-
-      const accessToken = signAccessToken({
-        id: user.id,
-        role: user.role,
-        username: user.username,
-      }, { realm: REALMS.USER });
-      return {
-        accessToken,
-        refreshToken: newRt.token,
-        accessExpiresIn: config.auth.accessTokenTtl ?? '15m',
-        user: {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        },
-      };
-    });
   }
 
   /* ==================== 로그아웃 (현재 세션) ==================== */
@@ -275,6 +241,7 @@ export default class AuthService {
 
   /* ==================== 전체 세션 로그아웃 ==================== */
   async logoutAll(userId) {
+    await db.execute(this.authSql.get('invalidateAccessTokens'), { user_id: userId });
     await db.execute(this.authSql.get('revokeAllUserTokens'), {
       user_id: userId,
     });
@@ -299,13 +266,14 @@ export default class AuthService {
     await db.execute(this.authSql.get('insertRefreshToken'), {
       user_id: user.id,
       token_hash: newRt.tokenHash,
+      token_version: Number(user.token_version ?? 0),
       family_id: familyId,
       user_agent: meta.userAgent ?? null,
       ip_address: meta.ip ?? null,
       expires_at: newRt.expiresAt,
     });
 
-    const accessToken = signAccessToken({ id: user.id, role: user.role, username: user.username }, { realm: REALMS.USER });
+    const accessToken = signAccessToken({ id: user.id, token_version: user.token_version, role: user.role, username: user.username }, { realm: REALMS.USER });
 
     return {
       accessToken,

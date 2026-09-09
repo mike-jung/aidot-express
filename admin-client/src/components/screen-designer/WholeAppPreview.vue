@@ -14,9 +14,10 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { useI18n } from '../../composables/useI18n';
 
-const { t } = useI18n();
 import { useAuthStore } from '../../stores/auth';
 import { buildWholeAppPreviewDoc } from '../../generator/screens/wholeAppPreviewBuilder';
+
+const { t } = useI18n();
 
 const auth = useAuthStore();
 const props = defineProps({

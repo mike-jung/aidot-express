@@ -442,7 +442,7 @@ const statusBadgeClass = computed(() => {
         </div>
 
         <details v-if="Object.keys(responseHeaders).length" class="small">
-          <summary class="text-secondary">응답 헤더 ({{ Object.keys(responseHeaders).length }})</summary>
+          <summary class="text-secondary">{{ t('designer.api_respHeaders') }} ({{ Object.keys(responseHeaders).length }})</summary>
           <div class="mt-2 p-2 rounded font-monospace" style="background:#f6f7f9; font-size:11px">
             <div v-for="(v, k) in responseHeaders" :key="k">
               <strong>{{ k }}</strong>: {{ v }}

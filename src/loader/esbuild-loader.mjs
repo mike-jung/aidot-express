@@ -23,7 +23,8 @@ const tsconfigRaw = {
   },
 };
 
-const TRANSFORM_EXT = new Set(['.js', '.mjs', '.ts', '.mts', '.cjs']);
+// CommonJS keeps native module.exports/require semantics; never rewrite it as ESM.
+const TRANSFORM_EXT = new Set(['.js', '.mjs', '.ts', '.mts']);
 const sep = path.sep;
 
 export async function load(url, context, nextLoad) {

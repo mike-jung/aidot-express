@@ -1,3 +1,5 @@
+const { ensureEnvSecret } = require('../src/core/secretPolicy.cjs');
+const { sameOrigin, assertSender, trustedSender, lockLocalWindow, validateSetup, parseAttachPort, envLine } = require('./security.cjs');
 /**
  * Aidot Express — Electron main process.
  *
@@ -36,6 +38,7 @@ const fs = require('node:fs');
  * 후자를 전자로 rename 해준다. 데이터 손실 방지.
  */
 function migrateLegacyUserData() {
+  if (usesCustomProfile()) return;
   try {
     const appDataRoot = app.getPath('appData');   // %APPDATA% 직접
     const newDir = path.join(appDataRoot, 'Aidot Express');
@@ -109,6 +112,7 @@ function probeExternalServer(port) {
  *  @returns {boolean} 인스톨러 값을 가져왔는가 (가져왔으면 설정 창을 띄우지 않는다)
  */
 function adoptInstallerEnv() {
+  if (usesCustomProfile()) return false;
   try {
     const resourcesPath = process.resourcesPath || '';
     if (!resourcesPath) return false;
@@ -232,7 +236,7 @@ function ensureUserEnv() {
   const fs = require('node:fs');
   const userDir = app.getPath('userData');
   const target = path.join(userDir, '.env');
-  if (fs.existsSync(target)) return target;
+  if (fs.existsSync(target)) { ensureEnvSecret(target); return target; }
 
   const candidates = [
     path.join(process.resourcesPath || '', 'app', '.env.example'),
@@ -247,10 +251,11 @@ function ensureUserEnv() {
      쓰려는 DB 는 MariaDB 인데 sqlite 로 열리면 "되는 줄 알았다가" 나중에 어긋난다.
      대신 첫 실행에서 **접속 정보를 물어본다**(showSetupWindow). */
   const text = source
-    ? fs.readFileSync(source, 'utf8')
+    ? fs.readFileSync(source, 'utf8').replace(/^NODE_ENV=.*$/m, 'NODE_ENV=production')
     : ['# Created on first run.', 'DB_TYPE=mariadb', 'DB_HOST=127.0.0.1', 'DB_PORT=3306',
-       'DB_USER=root', 'DB_PASSWORD=', 'DB_DATABASE=aidot_express', 'PORT=7901', ''].join('\n');
+       'DB_USER=root', 'DB_PASSWORD=', 'DB_DATABASE=aidot_express', 'PORT=7901', 'NODE_ENV=production', ''].join('\n');
   fs.writeFileSync(target, text, 'utf8');
+  ensureEnvSecret(target);
   console.log(`[electron] .env 를 만들었습니다: ${target}`);
   return target;
 }
@@ -263,9 +268,9 @@ function isFirstRun() {
 
 /** `.env` 의 한 줄을 바꾼다. 없으면 끝에 붙인다. 주석과 순서는 그대로 둔다. */
 function setEnvValue(text, key, value) {
-  const line = `${key}=${value}`;
+  const line = envLine(key, value);
   const re = new RegExp(`^#?\\s*${key}\\s*=.*$`, 'm');
-  return re.test(text) ? text.replace(re, line) : `${text.replace(/\n*$/, '')}\n${line}\n`;
+  return re.test(text) ? text.replace(re, () => line) : `${text.replace(/\n*$/, '')}\n${line}\n`;
 }
 
 /**
@@ -285,9 +290,10 @@ function showSetupWindow(envPath) {
       title: 'Aidot Express — 처음 설정',
       webPreferences: {
         preload: path.join(__dirname, 'setup-preload.cjs'),
-        contextIsolation: true, nodeIntegration: false,
+        contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
     });
+    lockLocalWindow(win);
     win.setMenuBarVisibility(false);
     win.loadFile(path.join(__dirname, 'setup.html'));
 
@@ -302,14 +308,22 @@ function showSetupWindow(envPath) {
       resolve(how);
     };
 
-    ipcMain.handle('setup:test-db', async (_e, cfg) => testDbConnection(cfg));
+    ipcMain.handle('setup:test-db', async (event, cfg) => {
+      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
+      return testDbConnection(validateSetup(cfg));
+    });
 
-    ipcMain.handle('setup:save', async (_e, cfg) => {
+    ipcMain.handle('setup:save', async (event, cfg) => {
+      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
+      cfg = validateSetup(cfg);
       try {
         let text = fs.readFileSync(envPath, 'utf8');
         text = setEnvValue(text, 'DB_TYPE', cfg.type);
         text = setEnvValue(text, 'DB_DATABASE', cfg.database || 'aidot_express');
         text = setEnvValue(text, 'PORT', cfg.serverPort || '7901');
+        text = setEnvValue(text, 'CONTROL_PORT', String(Number(cfg.serverPort || '7901') + 1));
+        text = setEnvValue(text, 'HOST', '127.0.0.1');
+        text = setEnvValue(text, 'CONTROL_HOST', '127.0.0.1');
         if (cfg.type === 'sqlite') {
           text = setEnvValue(text, 'DB_FILE', cfg.dbfile || 'data/app.db');
         } else {
@@ -327,7 +341,10 @@ function showSetupWindow(envPath) {
       }
     });
 
-    ipcMain.handle('setup:skip', () => { finish('skipped'); return { ok: true }; });
+    ipcMain.handle('setup:skip', (event) => {
+      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
+      finish('skipped'); return { ok: true };
+    });
 
     /* 창을 그냥 닫아도 진행은 되어야 한다 — 갇히면 안 된다 */
     win.on('closed', () => finish('skipped'));
@@ -404,10 +421,11 @@ app.whenReady().then(async () => {
      *
      *  서버를 Windows 서비스로 올리면 OS 가 관리한다 — 로그인 전에도 뜨고, 죽으면 OS 가 되살린다.
      *  그 구성에서 Electron 이 서버를 또 띄우면 포트가 겹쳐 실패하거나, 창을 닫을 때
-     *  서비스 서버까지 내리는 사고가 난다. 그래서 먼저 두드려 보고, 살아 있으면 그쪽을 쓴다.
+     *  서비스 서버까지 내리는 사고가 난다. 그래서 AIDOT_SERVER_PORT를 명시했을 때만 해당 서비스에 연결한다.
      *  (scripts/windows/install-service.ps1 로 올린 서비스가 이 경우다) */
-    const externalPort = Number(process.env.AIDOT_SERVER_PORT) || 7901;
-    const external = await probeExternalServer(externalPort);
+    const externalPort = parseAttachPort(process.env.AIDOT_SERVER_PORT);
+    const external = externalPort !== null && await probeExternalServer(externalPort);
+    if (externalPort !== null && !external) throw new Error('The explicitly selected Aidot server is unavailable');
     let result;
     if (external) {
       console.log(`[electron] 이미 떠 있는 서버에 붙습니다 (:${externalPort}) — 서비스로 운영 중`);
@@ -426,7 +444,7 @@ app.whenReady().then(async () => {
     console.log(`[electron] server ready on :${serverPort} in ${elapsed}ms`);
 
     // 2) 서버가 예기치 않게 죽으면 경고
-    serverProc.on('exit', (code) => {
+    serverProc?.on('exit', (code) => {
       serverReady = false;
       console.error(`[electron] server exited unexpectedly code=${code}`);
       if (!isQuitting) onServerCrash(code);
@@ -434,17 +452,23 @@ app.whenReady().then(async () => {
 
     // 3) 트레이 + 메인 윈도우 생성 (기본 hidden)
     createTray();
-    createMainWindow();    // show: false → tray 에서 열어야 보임
+    createMainWindow();    // --hidden is reserved for background startup
+    if (!process.argv.includes('--hidden')) showMainWindow();
 
     // 4) 스플래시 닫기 + 시작 완료 토스트
     closeSplash();
+    const initialFile = path.join(app.getPath('userData'), 'initial-admin-credentials.json');
+    if (!serverExternal && fs.existsSync(initialFile)) {
+      const initial = JSON.parse(fs.readFileSync(initialFile, 'utf8'));
+      await dialog.showMessageBox(mainWin, {
+        type: 'info', title: 'Initial administrator sign-in',
+        message: `Username: ${initial.username}`,
+        detail: `Initial password: ${initial.password}\n\nChange this password after signing in.`, buttons: ['Continue'],
+      });
+    }
     notifyToast(`${APP_NAME} 시작됨`, `서버가 포트 ${serverPort} 에서 실행 중입니다.`);
 
-    // 5) 로그인 시 자동 시작 등록 (Windows/Mac)
-    //    'openAsHidden' 로 등록하면 부팅 후 트레이에만 나타남
-    if (!isDev()) {
-      app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
-    }
+    // Login startup is changed only by the user's explicit tray-menu action.
 
   } catch (e) {
     closeSplash();
@@ -477,9 +501,10 @@ function showErrorWindow(info) {
       title: '서버 시작 실패',
       webPreferences: {
         preload: path.join(__dirname, 'error-preload.cjs'),
-        contextIsolation: true, nodeIntegration: false,
+        contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
     });
+    lockLocalWindow(win);
     win.setMenuBarVisibility(false);
     win.loadFile(path.join(__dirname, 'error.html'));
 
@@ -502,9 +527,9 @@ function showErrorWindow(info) {
       resolve();
     };
     /* 폴더를 열어 준다 — 경로를 손으로 옮겨 적게 하지 않는다 */
-    ipcMain.on('error:open-log', () => { if (info.logPath) shell.openPath(info.logPath); });
-    ipcMain.on('error:open-env', () => { if (info.envPath) shell.showItemInFolder(info.envPath); });
-    ipcMain.on('error:quit', done);
+    ipcMain.on('error:open-log', (event) => { if (!trustedSender(event, win, path.join(__dirname, 'error.html'), { file: true })) return; if (info.logPath) shell.openPath(info.logPath); });
+    ipcMain.on('error:open-env', (event) => { if (!trustedSender(event, win, path.join(__dirname, 'error.html'), { file: true })) return; if (info.envPath) shell.showItemInFolder(info.envPath); });
+    ipcMain.on('error:quit', (event) => { if (trustedSender(event, win, path.join(__dirname, 'error.html'), { file: true })) done(); });
     win.on('closed', () => done());
   });
 }
@@ -553,6 +578,19 @@ function rebuildTrayMenu() {
     { type: 'separator' },
     { label: '개발자 도구', click: toggleDevTools, visible: isDev() },
     { label: '로그 파일 열기', click: openLogFile },
+    ...(process.platform === 'win32' || process.platform === 'darwin' ? [{
+      label: '로그인 시 자동 시작', type: 'checkbox',
+      checked: loginStartupEnabled(), enabled: !usesCustomProfile(),
+      click: (item) => {
+        try {
+          app.setLoginItemSettings({ openAtLogin: item.checked, ...loginStartupOptions() });
+          rebuildTrayMenu();
+        } catch (error) {
+          dialog.showErrorBox('자동 시작 설정 실패', error.message);
+          rebuildTrayMenu();
+        }
+      },
+    }] : []),
     { type: 'separator' },
     { label: '서버 종료', click: confirmQuit },
   ]);
@@ -626,6 +664,11 @@ function createMainWindow() {
       mainWin.hide();
     }
   });
+
+  mainWin.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  mainWin.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  mainWin.webContents.session.setPermissionCheckHandler(() => false);
+  mainWin.webContents.on('will-redirect', (event, url) => { if (!isAllowedInternalUrl(url)) event.preventDefault(); });
 
   // 외부 링크는 기본 브라우저로 — http/https 만 허용 (file:, ms-msdt: 같은 위험한 스킴 차단)
   mainWin.webContents.setWindowOpenHandler(({ url }) => {
@@ -765,6 +808,25 @@ function isDev() {
   return !app.isPackaged;
 }
 
+function usesCustomProfile() {
+  const standard = path.join(app.getPath('appData'), 'Aidot Express');
+  return path.relative(standard, app.getPath('userData')) !== '';
+}
+
+function loginStartupOptions() {
+  return process.platform === 'win32'
+    ? { path: process.execPath, args: ['--hidden'] }
+    : { openAsHidden: true, args: ['--hidden'] };
+}
+
+function loginStartupEnabled() {
+  if (usesCustomProfile()) return false;
+  try {
+    return app.getLoginItemSettings(loginStartupOptions()).openAtLogin
+      || app.getLoginItemSettings().openAtLogin;
+  } catch { return false; }
+}
+
 /** 기본 브라우저로 열어도 되는 URL 인가 (http/https 만) */
 function isSafeExternalUrl(url) {
   try {
@@ -775,27 +837,24 @@ function isSafeExternalUrl(url) {
 
 /** 앱 창 안에서 이동해도 되는 URL 인가 — 로컬 서버(loopback) 와 Vite dev 서버, 내부 에러 페이지만 */
 function isAllowedInternalUrl(url) {
-  const str = String(url);
-  if (str.startsWith('data:text/html')) return true;   // did-fail-load 에러 페이지
-  try {
-    const u = new URL(str);
-    if (VITE_DEV_URL && str.startsWith(VITE_DEV_URL)) return true;
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
-    return ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(u.hostname);
-  } catch { return false; }
+  return sameOrigin(url, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
 }
 
 /* ─────────────────────────── IPC (preload 에서 사용) ─────────────────────────── */
 
-ipcMain.handle('app:info', () => ({
+ipcMain.handle('app:info', (event) => {
+  assertSender(event, mainWin, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
+  return ({
   name: APP_NAME,
   version: app.getVersion(),
   port: serverPort,
   serverReady,
   isDev: isDev(),
-}));
+});
+});
 
-ipcMain.handle('app:open-external', (_e, url) => {
+ipcMain.handle('app:open-external', (event, url) => {
+  assertSender(event, mainWin, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
   if (isSafeExternalUrl(url)) return shell.openExternal(url);
   console.warn(`[electron] 차단된 openExternal 요청: ${url}`);
   return false;

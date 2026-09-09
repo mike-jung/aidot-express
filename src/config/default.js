@@ -2,6 +2,11 @@
 export default {
   server: {
     port: 3000,
+    host: '0.0.0.0',
+    headersTimeoutMs: 15000,
+    requestTimeoutMs: 120000,
+    keepAliveTimeoutMs: 5000,
+    maxRequestsPerSocket: 1000,
     bodyLimit: '10mb',
     // 리버스 프록시(Nginx/Caddy/IIS ARR) 뒤에 있을 때만 1/true/'loopback' 로. (.env TRUST_PROXY)
     //   기본 false: 프록시가 없는데 켜 두면 클라이언트가 X-Forwarded-For 를 위조해 rate-limit 을 우회하고
@@ -127,11 +132,8 @@ export default {
     minPasswordLength: 10,
   },
   cors: {
-    // CORS 사양상 credentials:true 와 Access-Control-Allow-Origin:'*' 는 공존 불가.
-    //  origin:true → 요청의 Origin 헤더를 그대로 echo 하므로 credentials 와 안전하게 함께 사용.
-    //  운영 환경에서는 .env 의 CORS_ORIGIN 으로 화이트리스트(콤마 구분 문자열) 명시 권장.
-    //  예: CORS_ORIGIN=https://app.example.com,https://admin.example.com
-    origin: true,
+    // Empty list permits same-origin browser requests only.
+    origin: [],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   },

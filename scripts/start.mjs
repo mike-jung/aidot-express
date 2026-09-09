@@ -22,6 +22,7 @@
  *
  *  상태 파일: .cache/*.hash (git 에 포함하지 않음)
  */
+import { ensureEnvSecret } from '../src/core/secretPolicy.cjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -100,20 +101,7 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
    *    모두 같은 값을 갖게 되어, 누구나 admin 토큰을 위조할 수 있다.
    *    설치본마다 **다른** 값을 만들어 `.env` 에 적어 두는 것이 맞다.
    */
-  const WEAK = new Set(['', 'CHANGE_ME_IN_ENV_FILE_MINIMUM_32_CHARS_LONG!']);
-  const ensureSecret = (file) => {
-    if (!fs.existsSync(file)) return null;
-    let text = fs.readFileSync(file, 'utf8');
-    const cur = /^AUTH_ACCESS_SECRET=(.*)$/m.exec(text)?.[1]?.trim() ?? null;
-    const weak = cur === null || WEAK.has(cur) || cur.length < 32;
-    if (!weak) return null;
-    const secret = crypto.randomBytes(48).toString('base64url');
-    text = cur === null
-      ? `${text.replace(/\s*$/, '')}\nAUTH_ACCESS_SECRET=${secret}\n`
-      : text.replace(/^AUTH_ACCESS_SECRET=.*$/m, `AUTH_ACCESS_SECRET=${secret}`);
-    fs.writeFileSync(file, text, 'utf8');
-    return cur === null ? 'added' : 'replaced';
-  };
+  const ensureSecret = (file) => ensureEnvSecret(file);
   if (!fs.existsSync(envPath) && fs.existsSync(example) && !process.env.AIDOT_ENV_FILE) {
     const secret = crypto.randomBytes(48).toString('base64url');
     let text = fs.readFileSync(example, 'utf8');
@@ -182,7 +170,7 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
   const ac = path.join(root, 'admin-client');
   if (fs.existsSync(path.join(ac, 'package.json'))) {
     const srcFiles = [...walk(path.join(ac, 'src')), ...walk(path.join(ac, 'public')),
-      path.join(ac, 'index.html'), path.join(ac, 'vite.config.js'), path.join(ac, 'package.json')];
+      path.join(ac, 'index.html'), path.join(ac, 'vite.config.js'), path.join(ac, 'vite.public.js'), path.join(ac, 'edition-plugin.js'), path.join(ac, 'package.json'), path.join(root, 'package.json')];
     const want = hashFiles(srcFiles);
     const have = readHash('admin-client.hash');
     const hasDist = fs.existsSync(path.join(ac, 'dist', 'index.html'));

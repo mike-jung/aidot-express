@@ -21,6 +21,7 @@ import http from 'node:http';
 import logger from './util/logger.js';
 import config from './config/index.js';
 import { createControlApp } from './controlServer.js';
+import { configureHttpServer } from './core/httpLimits.js';
 import { Watchdog } from './watchdog.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -108,7 +109,7 @@ class Supervisor {
     this.child = spawn(cmd, args, {
       cwd: projectRoot,
       env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
 
     /* 자식이 뱉은 마지막 줄들을 기억한다 — 죽었을 때 원인이 대개 여기 있다 */
@@ -191,9 +192,10 @@ class Supervisor {
       child.once('exit', doneHandler);
 
       try {
-        if (process.platform === 'win32') {
-          // Windows 는 SIGTERM 신호가 없으므로 graceful 대신 tree kill 사용
-          child.kill();
+        if (child.connected) {
+          child.send({ type: 'aidot:shutdown' }, (error) => {
+            if (error && child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+          });
         } else {
           child.kill('SIGTERM');
         }
@@ -283,6 +285,7 @@ async function bootstrap() {
   const server = app.listen(controlPort, controlHost, () => {
     logger.info(`[supervisor] Control API http://${controlHost}:${controlPort}`);
   });
+  configureHttpServer(server, config.server);
 
   // ★ v1.11.0 — 생존 감시. 메인이 기동된 뒤 켠다 (기동 실패는 아래 로그가 이미 설명한다)
   const wdCfg = config.control?.watchdog || {};
@@ -346,7 +349,10 @@ async function bootstrap() {
   }
 
   // 종료 시그널 → 메인도 종료하고 자신도 종료
+  let shuttingDown = false;
   const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info(`[supervisor] ${signal} received, shutting down…`);
     try {
       if (sup.child && sup.child.exitCode === null && sup.child.signalCode === null) await sup.stop();
@@ -363,6 +369,9 @@ async function bootstrap() {
   };
   process.on('SIGINT',  () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('message', (message) => {
+    if (message?.type === 'aidot:shutdown') shutdown('PARENT_REQUEST');
+  });
   // Electron(부모) 이 강제 종료되면 fork IPC 채널이 끊긴다 → 메인 서버까지 정리하고 종료.
   //   (이게 없으면 앱을 강제 종료했을 때 서버 프로세스가 남아 포트를 계속 점유한다)
   process.on('disconnect', () => shutdown('PARENT_DISCONNECT'));

@@ -1,0 +1,143 @@
+{
+  "_comment": [
+    "Public distribution policy shared by source export and Electron builds.",
+    "Enterprise implementations are replaced with stubs before keep/deny processing."
+  ],
+  "deny": [
+    "mci-server/**",
+    "**/[Mm]ci*",
+    "**/*[Mm]ci*.{js,mjs,vue,json,md,sql,cjs}",
+    "src/core/mci/**",
+    "docs/MCI_*",
+    "docs/TUTORIAL_03_MCI_CONTROLLER.md",
+    "docs/answers/mci/**",
+    "docs/tutorial-src/build-mci-tutorial.cjs",
+    "docs/aidot-express-mci-tutorial-*",
+    "legacy/**",
+    "src/core/ha/**",
+    "docs/HA_*",
+    "docs/aidot-express-ha-tutorial-*",
+    "**/Ha{Page,Controller,Service}*",
+    "scripts/ha-*",
+    "tests/ha-*",
+    "**/[Bb]ackup{Page,Controller,Service}*",
+    "scripts/backup-secure-check.mjs",
+    "tests/backup-secure.test.mjs",
+    "docs/BACKUP_*",
+    "**/Secure{Column,Member}*",
+    "src/secure/**",
+    "src/database/sql/secure_member.sql",
+    "docs/SECURE_*",
+    ".env.secure.example",
+    "**/.env",
+    "**/.env.local",
+    "workspace/**",
+    "dist-electron/**",
+    "log/**",
+    "data/**",
+    "lib/admin/service/mci/**",
+    "tests/tutorial-fixes.test.mjs",
+    "docs/tutorial-src/**",
+    "docs/answers/**",
+    "CHANGELOG.md",
+    "APPLY-PATCH.md",
+    "docs/PUBLISHING.md",
+    "scripts/publish/**",
+    "scripts/mci-*",
+    "scripts/ha-*",
+    "scripts/backup-*",
+    "scripts/*-drill.mjs",
+    "scripts/*-check.mjs",
+    ".env.enterprise.example",
+    ".env.secure.example",
+    "examples/**",
+    "client/**",
+    "tests/_mci-*",
+    ".electron-builder.*.json",
+    ".eb-*.json",
+    "mci-server/samples/**",
+    "**/*.__full/**",
+    "**/*.__full",
+    "stubs/**",
+    "admin-client/dist/**",
+    "admin-client/dist-public/**",
+    "docs/REVIEW_1.43.0_KO.md",
+    "public/assets/**"
+  ],
+  "keep": [
+    "workspace/README.md",
+    "admin-client/vite.public.js",
+    "scripts/publish/policy.mjs",
+    "scripts/publish/public-filter.json",
+    "scripts/publish/pii-scan.mjs",
+    "scripts/publish/export-public.mjs",
+    "scripts/publish/sync-public.mjs"
+  ],
+  "scan": {
+    "_comment": [
+      "PII scanning is a heuristic release gate, not proof of absence of sensitive data."
+    ],
+    "koreanPatient": "환자\\s*(명|이름|번호|ID)\\s*[:=]\\s*[\"']?[가-힣0-9]{4,}",
+    "hospitalNames": "(삼성서울|서울대학교병원|서울아산|세브란스|의료원)",
+    "mciTelegram": "cfs_(bheader|sheader)_"
+  },
+  "scanExempt": [
+    "scripts/publish/**",
+    "CHANGELOG.md",
+    "docs/LICENSING.md",
+    "src/config/default.js",
+    "src/config/index.js"
+  ],
+  "maxDataFileBytes": 51200,
+  "allowOnly": {
+    "_comment": [
+      "docs/ is inverted on purpose. A deny list there would need editing every time",
+      "someone adds a design note, and the one that gets forgotten is the one that leaks.",
+      "Only finished, reader-facing material ships."
+    ],
+    "docs/**": [
+      "docs/aidot-express-tutorial-*.pdf",
+      "docs/LICENSING.md",
+      "docs/SECURITY_OPERATIONS.md",
+      "docs/UPGRADE_1.43.0.md",
+      "docs/ARCHITECTURE.md",
+      "docs/BUILD_AND_RELEASE.md",
+      "docs/UPGRADE_1.43.1.md",
+      "docs/UPGRADE_1.43.2.md",
+      "docs/WINDOWS_OPERATIONS.md"
+    ],
+    "tests/**": [
+      "tests/security-hardening.test.mjs",
+      "tests/sqlite-dialect.test.mjs",
+      "tests/handler-signature.test.mjs",
+      "tests/route-collision.test.mjs",
+      "tests/table-prefix.test.mjs",
+      "tests/migration-recover.test.mjs"
+    ]
+  },
+  "warn": {
+    "_comment": [
+      "Not blocking, but shown after a successful run.",
+      "Korean comments are fine internally; in a public repository they narrow the audience."
+    ],
+    "koreanComment": "^\\s*(#|//|\\*|/\\*)[^\\n]*[\\uAC00-\\uD7A3]"
+  },
+  "warnScope": [
+    "*.md",
+    ".env.example",
+    "README.md",
+    "NOTICE"
+  ],
+  "stubs": {
+    "_comment": [
+      "Replace these implementations with the matching stubs. Missing stubs are never copied from full source."
+    ],
+    "dirs": [
+      "src/core/ha",
+      "src/secure"
+    ],
+    "files": [
+      "lib/admin/service/BackupService.js"
+    ]
+  }
+}

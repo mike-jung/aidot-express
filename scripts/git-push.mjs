@@ -23,6 +23,7 @@
  *    npm run push -- "간식 API 추가"     메시지를 직접 적을 때
  *    npm run push -- --dry-run         무엇이 올라갈지만 보고 실제로는 안 올림
  */
+import { forbiddenLocalPath } from './publish/policy.mjs';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,7 +66,22 @@ if (env.GITHUB_PASSWORD || env.GITHUB_PASSWD) {
   console.error('  Put a Personal Access Token in GITHUB_TOKEN.');
 }
 if (!token) { console.error('✗ GITHUB_TOKEN is missing from .env (see the comment above).'); process.exit(1); }
-if (!repo || !repo.includes('/')) { console.error('✗ Write GITHUB_REPO in .env as "account/repository".'); process.exit(1); }
+if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo || '')) { console.error('✗ Write GITHUB_REPO in .env as "account/repository".'); process.exit(1); }
+
+// Full source must never be sent to an unverified public repository.
+if (repo === env.PUBLIC_REPO) throw new Error('GITHUB_REPO must be the private Full repository');
+if (dryRun) {
+  console.log(`Dry run: Full source target ${repo}, branch ${branch}. A real push verifies private visibility.`);
+  console.log(quiet('git', ['status', '--short']) || 'No local status available.');
+  process.exit(0);
+}
+const repositoryResponse = await fetch(`https://api.github.com/repos/${repo}`, {
+  headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  signal: AbortSignal.timeout(15000),
+});
+if (!repositoryResponse.ok || (await repositoryResponse.json()).private !== true) {
+  throw new Error('Full source push requires a repository verified as private');
+}
 
 /* ── git 저장소 준비 ────────────────────────────────────────────────── */
 if (!fs.existsSync(path.join(ROOT, '.git'))) {
@@ -168,8 +184,8 @@ if (lines.length > 30) console.log(`   … and ${lines.length - 30} more`);
    `.env.example` 은 올려도 되는 파일이라 걸리면 안 된다(실제로 걸렸었다). */
 const isSecretEnv = (line) => {
   const file = line.split(/\t/).pop() || '';
-  const base = file.split('/').pop();
-  return base === '.env' || /^\.env\.(local|production|development)$/.test(base);
+  if (line.startsWith('D\t')) return false;
+  return forbiddenLocalPath(file);
 };
 if (lines.some(isSecretEnv)) {
   console.error('\n✗ .env is in the commit. Add it to .gitignore and run again.');

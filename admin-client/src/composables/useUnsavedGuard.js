@@ -21,6 +21,8 @@
  * @param {{ message?: string, detail?: string }} [opts]
  */
 import { onBeforeUnmount, onMounted } from 'vue';
+import { useI18n } from './useI18n';
+const { t } = useI18n();
 import { onBeforeRouteLeave } from 'vue-router';
 import { confirmDialog } from './useConfirm';
 
@@ -49,11 +51,11 @@ export function useUnsavedGuard(isDirty, opts = {}) {
     if (skip) { skip = false; return true; }
     if (!dirty()) return true;
     return await confirmDialog({
-      title: '저장하지 않은 변경',
-      message: opts.message || '저장하지 않은 변경사항이 있습니다.\n이 화면을 떠날까요?',
-      detail: opts.detail || '떠나면 편집 중인 내용은 사라집니다.',
-      confirmText: '떠나기',
-      cancelText: '계속 편집',
+      title: t('designer.ug_title'),
+      message: opts.message || t('designer.ug_message'),
+      detail: opts.detail || '',
+      confirmText: t('designer.ug_leave'),
+      cancelText: t('designer.ug_stay'),
       variant: 'danger',
       icon: 'bi-exclamation-triangle',
     });

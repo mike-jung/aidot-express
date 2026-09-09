@@ -1,0 +1,2 @@
+ALTER TABLE admin_users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE admin_refresh_tokens ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;

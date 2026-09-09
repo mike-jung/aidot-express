@@ -33,7 +33,8 @@ UPDATE admin_users
    SET name = :name,
        email = :email,
        role = :role,
-       status = :status
+       status = :status,
+       token_version = token_version + 1
  WHERE id = :id;
 
 -- @name: updatePasswordForceChange
@@ -43,7 +44,8 @@ UPDATE admin_users
        failed_attempts = 0,
        locked_until = NULL,
        must_change_password = 1,
-       password_changed_at = NOW()
+       password_changed_at = NOW(),
+       token_version = token_version + 1
  WHERE id = :id;
 
 -- @name: updatePassword
@@ -52,7 +54,8 @@ UPDATE admin_users
        failed_attempts = 0,
        locked_until = NULL,
        must_change_password = 0,
-       password_changed_at = NOW()
+       password_changed_at = NOW(),
+       token_version = token_version + 1
  WHERE id = :id;
 
 -- @name: deleteById

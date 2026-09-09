@@ -17,3 +17,8 @@ examples/**/dist
 # generated per-edition build config
 .electron-builder.*.json
 .wsl-build.sh
+
+admin-client/dist-public
+
+# Local rollback copies may contain Enterprise source.
+.patch-backups/

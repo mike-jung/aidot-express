@@ -15,11 +15,18 @@ const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** 위험한 키가 포함된 객체인지 재귀 검사 */
 export function hasPollutionKey(obj, depth = 0) {
-  if (depth > 20) return false;           // 너무 깊은 트리는 스킵 (DoS 방어)
-  if (obj === null || typeof obj !== 'object') return false;
-  for (const k of Object.keys(obj)) {
-    if (DANGEROUS_KEYS.has(k)) return true;
-    if (hasPollutionKey(obj[k], depth + 1)) return true;
+  const stack = [[obj, depth]];
+  const seen = new WeakSet();
+  let keys = 0;
+  while (stack.length) {
+    const [value, level] = stack.pop();
+    if (value === null || typeof value !== 'object') continue;
+    if (level > 20 || seen.has(value)) return true;
+    seen.add(value);
+    for (const key of Object.keys(value)) {
+      if (++keys > 100000 || DANGEROUS_KEYS.has(key)) return true;
+      if (value[key] && typeof value[key] === 'object') stack.push([value[key], level + 1]);
+    }
   }
   return false;
 }

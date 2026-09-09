@@ -83,7 +83,7 @@ function trapTab(e) {
 
 /* ---------------- 내 정보 ---------------- */
 const me = computed(() => auth.user || {});
-const roleLabel = computed(() => (me.value.role === 'admin' ? '관리자 (admin)' : (me.value.role || '-')));
+const roleLabel = computed(() => (me.value.role === 'admin' ? `${t('designer.set_adminRole')} (admin)` : (me.value.role === 'user' ? `${t('designer.set_userRole')} (user)` : me.value.role)));
 
 /* ---------------- 비밀번호 변경 ---------------- */
 const pwd = reactive({
@@ -117,9 +117,10 @@ async function savePwd() {
       currentPassword: pwd.current,
       newPassword: pwd.next,
     });
+    // 비밀번호 변경은 이전 토큰을 폐기하므로 새 비밀번호로 세션을 갱신한다.
+    await auth.login({ username: auth.user.username, password: pwd.next });
     pwd.message= t('settingsLabel.k7');
     pwd.current = ''; pwd.next = ''; pwd.confirm = '';
-    // 초기 비밀번호 배너를 즉시 걷어낸다
     if (auth.user) auth.user.mustChangePassword = false;
     setTimeout(() => { pwd.open = false; pwd.message = null; }, 1200);
   } catch (e) {
@@ -237,7 +238,7 @@ async function loadEai() {
   eai.loading = true;
   try {
     const d = (await http.get('/api/admin/config/eai')).data?.data || {};
-    eai.enabled = !!d.enabled; eai.note = d.note || '';
+    eai.enabled = !!d.enabled; eai.note = d.noteKey ? t('designer.' + d.noteKey) : d.note || '';
   } catch (e) { eai.error = e?.response?.data?.message || e.message; }
   finally { eai.loading = false; }
 }

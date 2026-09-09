@@ -1,7 +1,7 @@
 {
-  "version": "1.41.3",
+  "version": "1.43.2",
   "channel": "release",
-  "builtAt": "2026-09-08T04:34:43.482475Z",
-  "artifact": "aidot-express-1.41.3-full.zip",
-  "node": "22.22.2"
+  "builtAt": "2026-09-09T19:56:12.556709+00:00",
+  "artifact": "aidot-express-1.43.2-full.zip",
+  "node": "24.19.0"
 }

@@ -3,7 +3,7 @@
  *
  * 전략:
  *  - Access Token: JWT (HS256). 페이로드에 최소 정보만 (sub, role). 15분 만료.
- *    stateless 검증이므로 DB 조회 없이 매 요청 검증.
+ *    서명 검증 후 보호된 요청은 DB 계정 상태/버전을 확인.
  *  - Refresh Token: 크립토 랜덤 256bit (opaque). JWT 가 아님 — 크기 작고
  *    서버 측 상태(auth_sessions)와 함께 써야 rotation/revocation 가능.
  *    DB 에는 SHA-256 해시만 저장 (유출 대비).
@@ -15,6 +15,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import config from '../config/index.js';
+import { isPlaceholderSecret } from './secretPolicy.cjs';
 
 /** JWT 서명 알고리즘은 고정. 공격자가 'alg: none' 이나 비대칭↔대칭 혼동으로
  *  우회하는 것을 방지하기 위해 verify 시 algorithms 를 명시적으로 제한. */
@@ -37,9 +38,9 @@ export function assessSecret(s) {
   if (!s || typeof s !== 'string') return { ok: false, level: 'error', reason: 'AUTH_ACCESS_SECRET 이 비어 있습니다' };
   if (s.length < 32) return { ok: false, level: 'error', reason: `AUTH_ACCESS_SECRET 이 너무 짧습니다 (${s.length}자, 최소 32자)` };
   if (KNOWN_WEAK_SECRETS.has(s)) return { ok: false, level: 'error', reason: 'AUTH_ACCESS_SECRET 이 배포본의 기본값(플레이스홀더)입니다' };
-  if (new Set(s).size < 16) return { ok: false, level: 'error', reason: 'AUTH_ACCESS_SECRET 의 문자 다양성이 너무 낮습니다 (랜덤 값을 사용하세요)' };
+  if (new Set(s).size < 8) return { ok: false, level: 'error', reason: 'AUTH_ACCESS_SECRET 의 문자 다양성이 너무 낮습니다 (랜덤 값을 사용하세요)' };
   if (/^(dev|test|sample|example)[-_]/i.test(s) || /change[-_ ]?me/i.test(s)) {
-    return { ok: false, level: 'warn', reason: 'AUTH_ACCESS_SECRET 이 개발용 자리표시 문자열로 보입니다 (dev-/test-/change-me). 운영 전 교체하세요' };
+    return { ok: false, level: 'error', reason: 'AUTH_ACCESS_SECRET 이 개발용 자리표시 문자열로 보입니다 (dev-/test-/change-me). 운영 전 교체하세요' };
   }
   return { ok: true, level: 'ok' };
 }
@@ -49,7 +50,7 @@ let _warnedEphemeral = false;
 
 export function getAccessSecret() {
   const s = config.auth.accessSecret;
-  const weak = !s || s.length < 32 || KNOWN_WEAK_SECRETS.has(s);
+  const weak = isPlaceholderSecret(s) || KNOWN_WEAK_SECRETS.has(s);
   if (!weak) return s;
 
   if (config.env === 'production') {
@@ -76,6 +77,7 @@ export function signAccessToken(user, opts = {}) {
   }
   const payload = {
     sub: String(user.id),
+    ver: Number(user.token_version ?? user.ver ?? 0),
     role: user.role ?? 'user',
     // realm: 어느 계정 테이블(users | admin_users)에서 발급됐는지.
     //   controllerLoader 의 @Auth 가드가 lib/admin 컨트롤러에는 realm='admin' 을 강제한다.

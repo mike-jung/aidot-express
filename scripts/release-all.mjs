@@ -88,7 +88,7 @@ if (!noPublish) {
     console.log('\n· --dry-run — skipping the release.');
   }
 
-  step('공개판 갱신', ['run', 'sync:public', ...extra]);
+  step('공개판 갱신', ['run', 'sync:public', '--', dryRun ? '--dry-run' : '--push']);
 }
 
 report();

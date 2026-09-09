@@ -2,13 +2,13 @@
 -- 일반 인증과 같은 패턴이지만 admin_users / admin_refresh_tokens 사용
 
 -- @name: findUserByUsername
-SELECT id, name, username, email, password_hash, role, status, failed_attempts, locked_until,
+SELECT id, token_version, name, username, email, password_hash, role, status, failed_attempts, locked_until,
        must_change_password
   FROM admin_users
  WHERE username = :username;
 
 -- @name: findUserById
-SELECT id, name, username, email, role, status, created_at, last_login_at, must_change_password
+SELECT id, token_version, name, username, email, role, status, created_at, last_login_at, must_change_password
   FROM admin_users
  WHERE id = :id;
 
@@ -35,12 +35,12 @@ UPDATE admin_users
 
 -- @name: insertRefreshToken
 INSERT INTO admin_refresh_tokens
-  (user_id, token_hash, family_id, user_agent, ip_address, expires_at)
+  (user_id, token_hash, family_id, user_agent, ip_address, expires_at, token_version)
 VALUES
-  (:user_id, :token_hash, :family_id, :user_agent, :ip_address, :expires_at);
+  (:user_id, :token_hash, :family_id, :user_agent, :ip_address, :expires_at, :token_version);
 
 -- @name: findRefreshToken
-SELECT id, user_id, token_hash, family_id, expires_at, revoked_at, replaced_by_id
+SELECT id, user_id, token_hash, family_id, expires_at, revoked_at, replaced_by_id, token_version
   FROM admin_refresh_tokens
  WHERE token_hash = :token_hash;
 
@@ -88,3 +88,10 @@ UPDATE admin_users
 --   비밀번호를 바꿀 방법이 없는 교착이 됐다. 대신 로그인 직후 변경을 요구한다.
 -- @name: setMustChangePassword
 UPDATE admin_users SET must_change_password = 1 WHERE username = :username;
+
+-- @name: claimRefreshToken
+UPDATE admin_refresh_tokens SET revoked_at = NOW()
+ WHERE id = :id AND revoked_at IS NULL AND expires_at > NOW();
+
+-- @name: invalidateAccessTokens
+UPDATE admin_users SET token_version = token_version + 1 WHERE id = :user_id;

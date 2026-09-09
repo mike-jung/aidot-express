@@ -1,8 +1,10 @@
 import express from 'express';
-import cors from 'cors';
+import { originPolicy } from './core/originPolicy.js';
+import { redactUrl } from './core/logRedaction.js';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import { uploadHeaders } from './core/uploadHeaders.js';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import path from 'node:path';
@@ -132,7 +134,7 @@ export async function createServer() {
   });
 
   // === CORS ===
-  app.use(cors(config.cors));
+  app.use(originPolicy(config));
 
   // === 압축 ===
   //  ⚠ compressible('text/event-stream') === true 라서, 기본 설정이면 SSE 스트림도 gzip 대상이 된다.
@@ -198,9 +200,14 @@ export async function createServer() {
         standardHeaders: 'draft-8',
         legacyHeaders: false,
         message: { ok: false, message: 'Too Many Requests' },
+        skip: (req) => /^\/health(?:\/|$)/.test(req.path),
       }),
     );
 
+  }
+
+  // Authentication throttling remains enabled when general throttling is disabled.
+  {
     // 인증 엔드포인트는 더 강하게 (brute-force 방어)
     const authLimiter = rateLimit({
       windowMs: config.security.authRateLimit.windowMs,
@@ -224,7 +231,7 @@ export async function createServer() {
   //  - user: @Auth 가드가 세팅한 req.user.username (없으면 '-')
   morgan.token('httpLine', (req) => {
     const method = req.method;
-    const url = req.originalUrl || req.url || '';
+    const url = redactUrl(req.originalUrl || req.url || '');
     const version = req.httpVersion || '1.1';
     return `"${method} ${url} HTTP/${version}"`;
   });
@@ -237,8 +244,9 @@ export async function createServer() {
     // username 우선, 없으면 id 기반 "u:123" 형태
     return String(u.username ?? (u.id ? `u:${u.id}` : '-'));
   });
+  morgan.token('safeReferrer', (req) => redactUrl(req.get('referer') || '-'));
   const httpLogFormat =
-    ':clientIp user=:authUser :httpLine :status :res[content-length] ":referrer" ":user-agent"';
+    ':clientIp user=:authUser :httpLine :status :res[content-length] ":safeReferrer" ":user-agent"';
   // ★ v1.11.0 — supervisor 의 생존 감시가 10초마다 /health/live 를 친다. 그 줄까지 로그에 남기면
   //   하루 8,640줄이 감시 잡음이다. 실패하면 supervisor 쪽 로그([watchdog])에 남으므로 여기서는 뺀다.
   /* ★ v1.15.0 — 로그에 남길 이유가 없는 요청은 아예 찍지 않는다.
@@ -282,6 +290,7 @@ export async function createServer() {
     // 레거시 public 은 '/public' 경로로 별도 제공 (index 없이 파일만 접근 가능)
     app.use('/public',
       express.static(publicDir, {
+        setHeaders: uploadHeaders(publicDir),
         dotfiles: 'deny',
         index: false,
         fallthrough: true,
@@ -290,12 +299,13 @@ export async function createServer() {
     /* ★ v1.11.2 — 올린 파일. UploadController 가 public/uploads/ 에 저장하고 `/uploads/<이름>` 을 돌려주는데,
        콘솔 빌드(dist)가 있을 때는 public 이 /public 에만 붙어 그 주소가 SPA 의 index.html 로 떨어졌다. */
     app.use('/uploads',
-      express.static(path.join(publicDir, 'uploads'), { dotfiles: 'deny', index: false, fallthrough: true }),
+      express.static(path.join(publicDir, 'uploads'), { dotfiles: 'deny', index: false, fallthrough: true, setHeaders: uploadHeaders(publicDir) }),
     );
   } else {
     // dist 가 없으면 기존처럼 public 만 루트에 서빙
     app.use(
       express.static(publicDir, {
+        setHeaders: uploadHeaders(publicDir),
         dotfiles: 'deny',
         index: ['index.html'],
         fallthrough: true,
@@ -330,7 +340,7 @@ export async function createServer() {
          진입 장치(NLB·프록시·LB)가 헬스체크만 보고 액티브로만 보내게 하기 위한 표준 규약이다.
          단 `?role=any` 로 물으면 200 을 준다 — "이 서버가 살아 있나" 를 따로 보고 싶을 때 쓴다. */
     const ha = getHaAgent().status();
-    const roleOk = !ha.enabled || ha.role === 'active' || String(_req.query?.role || '') === 'any';
+    const roleOk = !ha.enabled || getHaAgent().isActive() || String(_req.query?.role || '') === 'any';
     checks.haRole = roleOk;
     const ok = Object.values(checks).every(Boolean);
     /* ★ v1.11.0 — 판정에는 넣지 않고 **보여 주기만** 하는 것들.
@@ -344,7 +354,7 @@ export async function createServer() {
       status: readiness.draining ? 'draining' : (ok ? 'ready' : 'not-ready'),
       checks,
       ha: ha.enabled ? { role: ha.role, reason: ha.reason, nodeId: ha.nodeId, fenceToken: ha.fenceToken } : { enabled: false },
-      details: { mci, loopLag: loopLagStats(), skippedFiles: bootProblems.map((b) => ({ kind: b.kind, file: b.file, message: b.message })) },
+      ...(config.env !== 'production' ? { details: { mci, loopLag: loopLagStats(), skippedFiles: bootProblems.map((b) => ({ kind: b.kind, file: b.file, message: b.message })) } } : {}),
       ts: Date.now(),
     });
   });
@@ -592,29 +602,31 @@ export async function createServer() {
        DB 관측은 여기서 주입한다 — 에이전트가 DB 구현을 몰라도 되게. */
   try {
     const { initHa } = await import('./core/ha/index.js');
-    initHa({
+    await initHa({
       logger,
       db: {
         ping: async () => { try { await db.execute('SELECT 1 AS ok', {}); return true; } catch { return false; } },
         isWritable: async () => {
-          try {
-            const r = await db.execute('SELECT @@read_only AS ro', {});
-            return Number(r.rows?.[0]?.ro ?? 1) === 0;
-          } catch { return false; }
+          const r = await db.execute('SELECT @@read_only AS ro', {});
+          if (r.rows?.[0]?.ro == null) throw new Error('Database read-only state is unknown');
+          return Number(r.rows[0].ro) === 0;
         },
         replicationStatus: async () => {
-          /* 복제가 살아 있으면 상대 primary 가 살아 있다는 뜻 —
-             이 신호 하나가 "방화벽 분단" 에서 스플릿브레인을 막는다. */
+          // A live replication link blocks takeover; it is one observation, not fencing.
           try {
             const r = await db.execute('SHOW SLAVE STATUS', {});
             const row = r.rows?.[0];
-            if (!row) return { ioRunning: false, lagSec: null };
+            if (!row) return { ioRunning: false, lagSec: null, known: true, ready: true };
             return {
               ioRunning: String(row.Slave_IO_Running || '').toLowerCase() === 'yes',
               sqlRunning: String(row.Slave_SQL_Running || '').toLowerCase() === 'yes',
               lagSec: row.Seconds_Behind_Master == null ? null : Number(row.Seconds_Behind_Master),
+              known: true,
+              ready: String(row.Slave_SQL_Running || '').toLowerCase() === 'yes'
+                && row.Master_Log_File === row.Relay_Master_Log_File
+                && Number(row.Exec_Master_Log_Pos) >= Number(row.Read_Master_Log_Pos),
             };
-          } catch { return { ioRunning: false, lagSec: null }; }
+          } catch { return { ioRunning: false, lagSec: null, known: false, ready: false }; }
         },
         setReadOnly: async (on) => { await db.execute(`SET GLOBAL read_only = ${on ? 'ON' : 'OFF'}`, {}); },
       },
@@ -642,7 +654,8 @@ export async function createServer() {
       },
     });
   } catch (e) {
-    logger.error(`[ha] could not start the agent — continuing without HA: ${e.message}`);
+    logger.error(`[ha] could not start the agent: ${e.message}`);
+    if (config.ha?.enabled || (config.ha?.mode && config.ha.mode !== 'standalone')) throw e;
   }
 
   // ★ v1.11.0 — MCI keep-alive 예열 (minIdle > 0 일 때만 실제로 연결한다). 실패해도 기동을 막지 않는다.
@@ -691,7 +704,9 @@ export async function createServer() {
   // === 전역 에러 핸들러 ===
   // production 에서는 스택 / 내부 에러 메시지를 절대 노출하지 않음 (정보 누설 방지)
   app.use((err, req, res, _next) => {
-    const status = err.status || err.statusCode || 500;
+    if (res.headersSent) return _next(err);
+    const candidate = Number(err.status || err.statusCode || 500);
+    const status = Number.isInteger(candidate) && candidate >= 400 && candidate <= 599 ? candidate : 500;
     // ★ v1.11.0 — "잠깐 뒤 다시" 를 앞단이 알 수 있게 (MCI 차단기·대기열 초과 → 503 + Retry-After 초)
     if (err.retryAfterMs && !res.headersSent) {
       res.set('Retry-After', String(Math.max(1, Math.ceil(err.retryAfterMs / 1000))));
@@ -700,9 +715,9 @@ export async function createServer() {
     // ★ v1.11.0 — 외부 시스템(MCI) 장애로 **예상되는** 5xx 는 스택 없이 한 줄. 장애 중에는 초당
     //   수백 건이 될 수 있고, 스택을 붙여 찍는 것이 그 자체로 CPU 를 먹는다. 원인은 [mci] 상태 전이
     //   로그에 이미 있다.
-    if (err.expectedOutage) logger.warn(`[${status}] ${req.method} ${req.originalUrl} — ${err.message} (${err.mciPhase || 'mci'})`);
+    if (err.expectedOutage) logger.warn(`[${status}] ${req.method} ${redactUrl(req.originalUrl)} — ${err.message} (${err.mciPhase || 'mci'})`);
     else if (status >= 500) logger.error(err);
-    else logger.warn(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
+    else logger.warn(`[${status}] ${req.method} ${redactUrl(req.originalUrl)} — ${err.message}`);
     const requestCode = req.body?.requestCode || req.query?.requestCode || null;
     const header = {
       requestCode,

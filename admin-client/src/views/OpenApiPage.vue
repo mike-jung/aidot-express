@@ -143,7 +143,7 @@ onMounted(load);
       <span>
         <i class="bi bi-file-code me-2"></i>{{ t('openapi.title') }}
         <small v-if="summary" class="text-secondary ms-2">
-          {{ summary.total }} 라우트 · {{ summary.tags }} 태그
+          {{ t('designer.oa_summary').replace('{routes}', summary.total).replace('{tags}', summary.tags) }}
         </small>
       </span>
       <div class="d-flex gap-2 align-items-center">

@@ -30,6 +30,22 @@ import { useDuration } from '../utils/duration';   // ★ v1.19.10 시간 표기
  *  설정 / 상태
  * ========================================================== */
 const { t } = useI18n();
+/* ★ v1.42.0 — 임계값 라벨은 **DB 에 한글로 저장돼** 있다 (마이그레이션 005 가 넣는다).
+   이미 실행된 마이그레이션은 되돌릴 수 없으므로 화면에서 알아보고 번역한다.
+   사용자가 직접 지은 라벨은 그대로 둔다 — 그건 그 사람의 말이다. */
+const THRESHOLD_KEY = {
+  'CPU 사용률 85% 초과': 'thr_cpu',
+  '메모리 사용률 90% 초과': 'thr_mem',
+  'HTTP 평균 응답시간 1초 초과': 'thr_httpMs',
+  'HTTP 에러율 10% 초과': 'thr_httpErr',
+  'DB 평균 쿼리시간 500ms 초과': 'thr_dbMs',
+  'DB 에러율 5% 초과': 'thr_dbErr',
+};
+const thresholdLabel = (label) => {
+  const k = THRESHOLD_KEY[String(label || '').trim()];
+  return k ? t('designer.' + k) : (label || '');
+};
+
 const { fmtDuration } = useDuration();
 
 const fmt = useFormat();
@@ -105,7 +121,7 @@ function applyCurrent(d) {
       seenAlertIds.add(a.id);
       notify(
         t('monLabel.alertTitle', { kind: a.kind, metric: a.metric }),
-        t('monLabel.alertBody', { label: a.label || '', cmp: a.comparator, threshold: fmtNum(a.threshold), peak: fmtNum(a.peak_value) }),
+        t('monLabel.alertBody', { label: thresholdLabel(a.label), cmp: a.comparator, threshold: fmtNum(a.threshold), peak: fmtNum(a.peak_value) }),
       );
     }
   }
@@ -153,7 +169,7 @@ function normalizeThresholdRow(r) {
     threshold: Number(r.threshold),
     durationSec: Number(r.duration_sec ?? r.durationSec ?? 30),
     enabled: Number(r.enabled) === 1 || r.enabled === true,
-    label: r.label || '',
+    label: thresholdLabel(r.label),
   };
 }
 
@@ -625,7 +641,7 @@ function metricsForKind(kind) { return METRIC_OPTIONS[kind] || []; }
                   <td class="small">{{ a.triggered_at }}</td>
                   <td>
                     <code class="small">{{ a.kind }}.{{ a.metric }}</code>
-                    <div class="small text-secondary">{{ a.label }}</div>
+                    <div class="small text-secondary">{{ thresholdLabel(a.label) }}</div>
                   </td>
                   <td class="small">{{ a.comparator }} {{ fmtNum(a.threshold) }} × {{ a.duration_sec }}s</td>
                   <td class="small"><strong class="text-danger">{{ fmtNum(a.peak_value) }}</strong></td>
@@ -752,6 +768,12 @@ function metricsForKind(kind) { return METRIC_OPTIONS[kind] || []; }
               <td>
                 <input type="text" class="form-control form-control-sm"
                        v-model="th.label" @input="markThresholdsDirty" :placeholder="t('mon3.descOptional')" />
+                <!-- ★ v1.42.0 — 기본 라벨은 DB 에 한글로 있다. 입력 상자의 값을 번역으로 바꾸면
+                     다른 칸만 고쳐도 영문 라벨이 저장된다. 값은 원문으로 두고 English 에서는
+                     번역을 아래에 작게 보여 준다. 사용자가 지은 라벨은 그대로다. -->
+                <div v-if="thresholdLabel(th.label) !== (th.label || '')" class="small text-secondary mt-1">
+                  {{ thresholdLabel(th.label) }}
+                </div>
               </td>
               <td>
                 <button class="btn btn-sm btn-outline-danger"

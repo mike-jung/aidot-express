@@ -136,8 +136,7 @@ function readEnvFileDecoded(filePath) {
     const v = process.env[k];
     if (v === undefined) return `${k}=<unset>`;
     if (/PASSWORD|SECRET|TOKEN/i.test(k)) {
-      const masked = v.length <= 4 ? '****' : v.slice(0, 2) + '***' + v.slice(-2);
-      return `${k}=${masked} (len=${v.length})`;
+      return `${k}=<redacted>`;
     }
     return `${k}=${v}`;
   });
@@ -152,6 +151,7 @@ function readEnvFileDecoded(filePath) {
 })();
 
 import defaultConfig from './default.js';
+import { validateServerLimits } from '../core/httpLimits.js';
 
 /** TRUST_PROXY 문자열 → express 'trust proxy' 설정값 */
 function parseTrustProxy(v) {
@@ -217,6 +217,11 @@ const dotenvOverrides = {
 
   server: {
     port: process.env.PORT ? Number(process.env.PORT) : undefined,
+    host: process.env.HOST || undefined,
+    headersTimeoutMs: process.env.HTTP_HEADERS_TIMEOUT_MS ? Number(process.env.HTTP_HEADERS_TIMEOUT_MS) : undefined,
+    requestTimeoutMs: process.env.HTTP_REQUEST_TIMEOUT_MS ? Number(process.env.HTTP_REQUEST_TIMEOUT_MS) : undefined,
+    keepAliveTimeoutMs: process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS ? Number(process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS) : undefined,
+    maxRequestsPerSocket: process.env.HTTP_MAX_REQUESTS_PER_SOCKET ? Number(process.env.HTTP_MAX_REQUESTS_PER_SOCKET) : undefined,
     // TRUST_PROXY=false | true | 1 | 2 | loopback | 10.0.0.0/8
     trustProxy: process.env.TRUST_PROXY !== undefined ? parseTrustProxy(process.env.TRUST_PROXY) : undefined,
     bodyLimit: process.env.BODY_LIMIT || undefined,
@@ -317,14 +322,7 @@ const dotenvOverrides = {
     },
   },
   cors: {
-    // CORS_ORIGIN='*' 인 경우 origin:true (요청 origin reflect) 로 변환.
-    //  credentials:true 와 함께 '*' 를 직접 응답 헤더에 쓰면 브라우저가 거부함 (CORS 사양).
-    //  화이트리스트는 콤마 구분 문자열로 받으며, cors 미들웨어가 배열을 그대로 처리.
-    origin: process.env.CORS_ORIGIN
-      ? (process.env.CORS_ORIGIN === '*'
-          ? true
-          : process.env.CORS_ORIGIN.split(',').map((s) => s.trim()))
-      : undefined,
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
   },
   db: {
     type: process.env.DB_TYPE,
@@ -497,6 +495,29 @@ function prune(obj) {
 
 const config = deepMerge(deepMerge(defaultConfig, envConfig), prune(dotenvOverrides));
 config.env = env;
+// Desktop loopback listeners must not accept a DNS-rebinding host name.
+config.server.allowedHosts = process.env.ALLOWED_HOSTS
+  ? process.env.ALLOWED_HOSTS.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean)
+  : process.env.ELECTRON_USER_DATA ? ['localhost', '127.0.0.1', '[::1]'] : [];
+if (config.server.allowedHosts.some((host) => !/^(?:[a-z0-9.-]+|\[::1\])$/.test(host))) throw new Error('ALLOWED_HOSTS must contain exact hostnames without schemes or ports');
+const editionPackage = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+config.edition = editionPackage.aidotEdition || 'full';
+if (config.edition === 'public') {
+  config.mci.enabled = false;
+  config.mci.generatorEnabled = false;
+  config.features = { backup: false, secureColumns: false, ha: false };
+  config.ha.enabled = false;
+  config.ha.mode = 'standalone';
+  config.secure.enabled = false;
+  if (config.mciGenerator) config.mciGenerator.enabled = false;
+}
+validateServerLimits(config.server);
+if (config.cors.origin === true || config.cors.origin === '*' || config.cors.origin?.includes?.('*')) {
+  throw new Error('CORS_ORIGIN requires exact origins; remove * or list trusted URLs');
+}
+if (config.auth.cookieSameSite === 'none' && !config.auth.cookieSecure) {
+  throw new Error('SameSite=None requires AUTH_COOKIE_SECURE=true');
+}
 
 // Phase 36 (patch-15): 기동 시 최종 해결된 MCI 설정을 한 줄 로깅.
 //   사용자가 "왜 .env 를 넣었는데 다른 IP 로 연결되나?" 를 즉시 진단할 수 있도록.

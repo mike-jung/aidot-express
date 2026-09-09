@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import editionPlugin from './edition-plugin.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -44,7 +45,8 @@ function resolveApiTarget() {
 const apiTarget = resolveApiTarget();
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), editionPlugin()],
+  define: { __AIDOT_EDITION__: JSON.stringify('full') },
   server: {
     port: 5174,
     host: '127.0.0.1',

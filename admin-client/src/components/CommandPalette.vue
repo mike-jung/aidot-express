@@ -14,9 +14,10 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from '../composables/useI18n';
 
-const { t } = useI18n();
 import { useRouter } from 'vue-router';
 import http from '../api/http';
+
+const { t } = useI18n();
 
 const props = defineProps({
   open: { type: Boolean, default: false },

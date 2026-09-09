@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 
 const STARTUP_TIMEOUT_MS = 30_000;
-const SHUTDOWN_GRACE_MS  = 5_000;
+const SHUTDOWN_GRACE_MS  = 15_000;
 
 function resolveAppRoot() {
   // packaged: process.resourcesPath/app/  (electron-builder 기본)
@@ -75,6 +75,7 @@ function startServerProcess({ onLog, userDataPath } = {}) {
         // ⭐ 사용자별 설정 저장소 — config/index.js 가 {userData}/.env 를 최우선 로드.
         //    인스톨러가 userData 에도 .env 를 쓰므로, 앱 재설치/업그레이드 시에도 사용자 설정 보존.
         ELECTRON_USER_DATA_PATH: userDataPath || '',
+        HOST: '127.0.0.1',
         // src/database/db.js 가 참조하는 별칭 (sqlite 파일 위치) — 두 이름 모두 채워 준다.
         ELECTRON_USER_DATA: userDataPath || '',
         // 로그도 설치 폴더가 아닌 userData 아래로 (설치 폴더 권한/재설치 이슈 회피)
@@ -176,23 +177,30 @@ function startServerProcess({ onLog, userDataPath } = {}) {
 }
 
 /**
- * 서버 프로세스 정상 종료. SIGTERM 먼저, 5초 내 exit 안하면 SIGKILL.
+ * Private IPC requests graceful shutdown on every platform, with a bounded fallback.
  * @param {import('child_process').ChildProcess|null} proc
  */
 function stopServerProcess(proc) {
   return new Promise((resolve) => {
     if (!proc || proc.exitCode !== null || proc.killed) return resolve();
     let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
+    let timer;
+    const finish = () => { if (!done) { done = true; clearTimeout(timer); resolve(); } };
 
     proc.once('exit', finish);
 
-    try { proc.kill('SIGTERM'); } catch {}
-    setTimeout(() => {
+    try {
+      if (proc.connected) proc.send({ type: 'aidot:shutdown' }, (error) => {
+        if (error && !done) { try { proc.kill('SIGTERM'); } catch {} }
+      });
+      else proc.kill('SIGTERM');
+    } catch { try { proc.kill('SIGTERM'); } catch {} }
+    timer = setTimeout(() => {
       if (!done && proc.exitCode === null) {
         try { proc.kill('SIGKILL'); } catch {}
       }
     }, SHUTDOWN_GRACE_MS);
+    timer.unref?.();
   });
 }
 

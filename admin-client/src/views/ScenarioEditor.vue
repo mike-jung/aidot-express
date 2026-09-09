@@ -188,7 +188,7 @@ onMounted(async () => {
     <div class="card-header d-flex justify-content-between align-items-center">
       <span>
         <i class="bi bi-collection-play me-2"></i>
-        시나리오 테스트 — {{ isNew ? t('scenarioEditor.k4') : t('scenarioEditor.k5') }}
+        {{ t('designer.scn_title') }} — {{ isNew ? t('scenarioEditor.k4') : t('scenarioEditor.k5') }}
       </span>
       <div class="d-flex gap-2">
         <button class="btn btn-sm btn-outline-secondary" @click="router.push({ name: 'scenarios' })">{{ t('scen.list') }}</button>
@@ -221,7 +221,7 @@ onMounted(async () => {
           <div class="d-flex justify-content-between align-items-center mb-1">
             <h6 class="mb-0 small text-secondary">
               <i class="bi bi-input-cursor-text me-1"></i>{{ t('scen.inputVars') }}
-              <small>(시작 시 미리 채울 변수, ${} 로 참조)</small>
+              <small>{{ t('designer.scn_varsHint') }}</small>
             </h6>
             <button class="btn btn-sm btn-outline-secondary" @click="addInputVar"><i class="bi bi-plus-lg"></i></button>
           </div>

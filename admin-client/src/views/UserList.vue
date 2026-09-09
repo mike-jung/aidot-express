@@ -154,6 +154,7 @@ async function saveMyPwd() {
       currentPassword: myPwd.currentPassword,
       newPassword: myPwd.newPassword,
     });
+    await auth.login({ username: auth.user.username, password: myPwd.newPassword });
     myPwd.message= t('userList.k17');
     if (auth.user) auth.user.mustChangePassword = false;   // 상단 '초기 비밀번호' 배너 해제
     myPwd.currentPassword = '';

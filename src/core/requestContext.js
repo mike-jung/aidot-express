@@ -26,6 +26,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
+import { redactUrl } from './logRedaction.js';
 
 const storage = new AsyncLocalStorage();
 
@@ -62,7 +63,7 @@ export function createContext(req) {
     spanId: hex(8),
     parentSpanId,
     method: req.method,
-    path: req.originalUrl || req.url || '',
+    path: redactUrl(req.originalUrl || req.url || ''),
     ip: req.ip || req.socket?.remoteAddress || '',
     userAgent: req.get?.('user-agent') || '',
     user: null,              // 인증 미들웨어가 나중에 채운다
