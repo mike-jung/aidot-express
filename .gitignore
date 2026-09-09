@@ -2,6 +2,7 @@ node_modules
 log
 data
 .env
+.env.local
 .env.*.local
 .cache
 .tmp

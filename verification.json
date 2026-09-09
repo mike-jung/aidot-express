@@ -1,0 +1,110 @@
+{
+  "version": "1.43.2",
+  "hotfix": "1.43.2-build-sync-hotfix-20260909",
+  "verifiedAt": "2026-09-09",
+  "changes": [
+    {
+      "path": ".gitignore",
+      "before": "9157639f1f078920685140fcc81eb3b7663287c2bbc59120fa9671703b6a0b75",
+      "after": "afcd368a7eaec23a6443d5e3ec22ff3423a743b59d608dcadef709e2e52350fb"
+    },
+    {
+      "path": "docs/BUILD_AND_RELEASE.md",
+      "before": "3115588a6ae7a4648e2ed31196c6454d2a92b30d14621b62834148b242860242",
+      "after": "796048419d54cd238672b5b3384fe8ebe98df1e499dd39ffaf1499186d7f2626"
+    },
+    {
+      "path": "package.json",
+      "before": "b1d5828177e8620dc8410b0183a7bd141046157a43201a2c16dd64d7c37cde16",
+      "after": "637a24b86034e7670c364fafc5e82c10d2eec06e19d171ead74c5e54aad9e6d7"
+    },
+    {
+      "path": "scripts/build-linux.mjs",
+      "before": "54da9fb9ed7a78eae7a2fc13137ea27aadb4747cdf5f85eddabed7b2a32aa0eb",
+      "after": "0909efdd241706324292e31d02ec19f600ca1b699396d9de8b5fc20fc76880cf"
+    },
+    {
+      "path": "scripts/linux-artifacts.mjs",
+      "before": null,
+      "after": "40ea6eaadd976ea80c6158502a517c23da7e224f3bca33b886854502c5521c1e"
+    },
+    {
+      "path": "scripts/publish/export-public.mjs",
+      "before": "c11e890f67626fd28e215d01dae21282b75e9e582bb26c04d6420dd31ed860e4",
+      "after": "fab375735d87eb631b6ae725ac644c40bbf993ed4c47a95c6e1b4a506835cb28"
+    },
+    {
+      "path": "scripts/publish/sync-public.mjs",
+      "before": "c3f26e14850519ef967d678ef424882ddeb23f2e68fc7c85def5ab37bad8519a",
+      "after": "862a7efddea704e8b11f3eebbc193d11a37c3ec97f5d8d728826fbb487252f88"
+    },
+    {
+      "path": "tests/linux-artifacts.test.mjs",
+      "before": null,
+      "after": "da6c63db7e367940cad5c94d385d2f4d9c3f8bb2822b6bf9509511498b853f80"
+    },
+    {
+      "path": "tests/public-sync.test.mjs",
+      "before": null,
+      "after": "a179741707f36cc29e48bc8f40fcb65d4b3bfb1720bed33af5efe0385cf9add3"
+    }
+  ],
+  "linuxRegression": {
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0
+  },
+  "windowsBaselineRegression": {
+    "passed": 139,
+    "failed": 0,
+    "skipped": 0
+  },
+  "windowsUserProjectRegression": {
+    "passed": 137,
+    "failed": 2,
+    "skipped": 0,
+    "failures": [
+      "Existing extra examples conflict with example allowlist test (98)",
+      "65 Korean log messages in extra controllers/services conflict with test (108)"
+    ]
+  },
+  "windowsPublicPolicy": {
+    "exitCode": 0,
+    "entries": 521,
+    "command": "npm run sync:public -- --dry-run"
+  },
+  "actualWslBuild": {
+    "exitCode": 0,
+    "command": "npm run dist:linux",
+    "node": "22.23.2",
+    "electron": "43.6.0",
+    "electronBuilder": "26.15.3",
+    "verifiedRuntimeFiles": 343,
+    "newAppImages": 1,
+    "archivedFiles": 11,
+    "archiveFilesPresent": true,
+    "successfulWorkRemoved": true,
+    "artifact": {
+      "name": "Aidot Express-1.43.2.AppImage",
+      "bytes": 161554696,
+      "sha256": "0d4e6e5a77351294d89e5703dbdb97024bfa98b0d3bdb5c6bedacbd8bf45b96c"
+    }
+  },
+  "gitPublicationTests": "real disposable local bare remotes on Linux and Windows; initial push, normal update, no-op, retained parent, deletion, ignored assets, CRLF hashes, wrong branch and non-fast-forward",
+  "githubPushed": false,
+  "patchChecks": [
+    "dry-run",
+    "conflict rejection before writes",
+    "application",
+    "idempotence"
+  ],
+  "sourceBasis": "Previous official 1.43.2 source plus this hotfix; excludes user-added project examples",
+  "notRun": [
+    "Docker image build",
+    "native Linux image build",
+    "tar.gz image build",
+    "Linux GUI run",
+    "Windows installer GUI",
+    "physical host HA"
+  ]
+}

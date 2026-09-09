@@ -57,15 +57,38 @@ The after-pack check rejects unexpected application files left in the package.
 
 ## Publication
 
-Review the exported tree and `PUBLIC_MANIFEST.json` before a public update. No remote
-write is performed by `export:public`, `check:public` or a normal `sync:public` call.
+Review the exported tree and `PUBLIC_MANIFEST.json` before a public update.
+
+| Command | Result |
+| --- | --- |
+| `npm run check:public` | Check file selection and content; no export or remote writes. |
+| `npm run sync:public -- --dry-run` | The same policy check, without committing or pushing. Authentication is not checked. |
+| `npm run export:public` | Create a local Public tree and print its location. |
+| `npm run sync:public` | Export, verify, commit and push Public source to GitHub. |
+
+The 1.43.2 build-tool hotfix restores publication as the normal `sync:public`
+command. In the original 1.43.2 package, this command only exported a temporary
+directory unless `--push` was added. The legacy `--push` option remains accepted.
 
 Set `PUBLIC_REPO=owner/public-repository` and `GITHUB_REPO=owner/private-repository`
 with separate identities. Use a credential helper or scoped secret from the release
 environment. Never embed a token in a remote URL, bundle, installer or document.
-`npm run sync:public -- --push` updates the existing public main history with a normal
-push and refuses a missing or identical repository setting. Remote divergence stops
-the push; inspect and retry from current state rather than force-pushing.
+Settings are loaded from `.env`, then `.env.local`, then process environment values.
+`GITHUB_TOKEN` or `GH_TOKEN` supplies an explicit token; without either, the configured
+Git credential helper is used. Configure Git identity or `GIT_USER_NAME` and
+`GIT_USER_EMAIL` for commits. A noninteractive credential failure exits nonzero.
+
+`npm run sync:public` updates the existing Public history with a normal push and
+refuses missing or identical Full/Public repository settings, including case-only
+differences. Set `PUBLIC_BRANCH` if the Public branch is not `main`. A completely
+empty repository can be initialized; a missing branch in a populated repository is
+an error. Remote divergence stops the push; inspect and retry rather than force-pushing.
+
+The isolated Git index must contain exactly the files listed in `PUBLIC_MANIFEST.json`
+plus the manifest itself, including ignored console build files. Manifest hashes
+describe the staged bytes after Git line-ending normalization. An unchanged snapshot
+exits successfully without an empty commit. A failed publication retains its export
+for inspection and reports failure instead of claiming completion.
 
 `npm run push` commits Full source only after the target repository is verified as
 private. Its dry run leaves the Git index and remotes unchanged.
@@ -99,3 +122,24 @@ CI jobs and output directories; add signed attestations and a reviewed SBOM.
 | Public scanner failure | Remove or replace the actual sensitive content; review any narrowly justified exemption. |
 | Private repository cannot be verified | Confirm repository identity and token access; do not publish Full artifacts to another target. |
 | No current installer found | Build the current package version; do not relabel a stale binary. |
+
+## Linux output isolation
+
+Each Linux build uses a new output directory. WSL also copies sources into a new
+directory below `$HOME/.cache/aidot-express-linux-build/runs`; successful work directories
+are removed and failed ones are retained for diagnosis. Electron and npm download
+caches remain reusable. Windows `node_modules`, local environment files, databases,
+logs, backup copies and prior installers are not copied into the WSL work tree.
+
+Only the exact current version and edition of the requested AppImage or tar.gz is
+collected. Missing output or a failed copy fails the command. After a verified copy,
+previous artifacts of the same product, edition and format are moved under
+`dist-electron/archive/<edition>/<run>/`, including an older build with the same
+filename. Other editions, Windows installers and unrelated files are preserved.
+`linux-<edition>-<appimage|targz>-latest.json` records the current file, size, SHA-256
+and archive locations. This applies to WSL, native Linux, Docker and tar.gz builds.
+
+Before this hotfix, WSL reused one directory for all releases. Its rsync command
+excluded `dist-electron` from both copying and normal deletion, then copied every
+`*.AppImage` back to Windows. That could make old versions reappear with new copy
+timestamps. The existing historical WSL cache is not read by the new build path.

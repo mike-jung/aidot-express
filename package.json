@@ -41,7 +41,7 @@
     "dist:all": "npm run dist:win && node scripts/build-edition.mjs --linux",
     "license:report": "npx --yes license-checker --summary",
     "ensure:deps": "node scripts/ensure-build-deps.mjs",
-    "sync:public": "node scripts/publish/sync-public.mjs",
+    "sync:public": "node scripts/publish/sync-public.mjs --push",
     "tut:extract": "node scripts/tutorial/extract-text.mjs",
     "tut:apply": "node scripts/tutorial/apply-text.mjs",
     "tut:check": "node scripts/tutorial/check-overflow.mjs",

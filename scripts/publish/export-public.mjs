@@ -6,7 +6,8 @@ import { publicEntries, verifyPublicAssets, scanEntries, entryManifest, readPoli
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function exportPublic(destination) {
+export function exportPublic(destination, sourceRoot = root) {
+  const root = sourceRoot;
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const entries = [...publicEntries(root), ...verifyPublicAssets(root, pkg.version)];
   scanEntries(root, entries);
