@@ -4,7 +4,7 @@
   "description": "Browser console for aidot-express — Vue 3 + Vite + Bootstrap 5 + CodeMirror",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --config vite.public.js",
     "build": "vite build --config vite.public.js --outDir dist",
     "preview": "vite preview"
   },

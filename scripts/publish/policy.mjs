@@ -46,23 +46,58 @@ export function readPolicy(root) {
   return JSON.parse(fs.readFileSync(path.join(root, 'scripts/publish/public-filter.json'), 'utf8'));
 }
 
-/** Return source/destination pairs, applying stubs before any keep exception. */
+/** Release tooling and assistant workspace notes never belong in Public output. */
+export function internalPublicPath(rel) {
+  return rel.split('/').some((name) =>
+    /^(?:\.claude|\.codex|\.cursor|\.agents|\.patch-backups|\.idea|\.vscode|\.history|__pycache__|\.pytest_cache|\.nyc_output|coverage|playwright-report|test-results)$/i.test(name)
+    || /^(?:AGENTS|CLAUDE|GEMINI|COPILOT)(?:[._-].*)?\.md$/i.test(name)
+    || /^(?:\.DS_Store|desktop\.ini)$/i.test(name)
+    || /(?:\.(?:log|tmp|bak|orig|rej)|~)$/i.test(name)
+    || /^(?:apply[-_](?:patch|hotfix)|README[-_](?:patch|hotfix))(?:[-_.].*)?$/i.test(name)
+    || /^(?:patch|hotfix)[-_](?:payload|manifest)(?:[-_.].*)?$/i.test(name)
+    || /^(?:SOURCE|PATCH|FULL)[-_]MANIFEST(?:[-_.].*)?$/i.test(name)
+    || /^verification(?:[-_].*)?\.(?:json|md|txt|log)$/i.test(name));
+}
+
+/** One path decision is shared by selection and final source publication. */
+export function publicPathDecision(rel, policy) {
+  if (forbiddenLocalPath(rel)) return { included: false, reason: 'local-state-or-secret' };
+  if (internalPublicPath(rel)) return { included: false, reason: 'internal-release-file' };
+  if (rel.startsWith('stubs/') || rel.startsWith('admin-client/dist/') || rel.startsWith('admin-client/dist-public/')) return { included: false, reason: 'generated-or-replacement-input' };
+  if (rel.includes('/') && policy.sourceRoots && !policy.sourceRoots.includes(rel.split('/')[0])) return { included: false, reason: 'unreviewed-root-directory' };
+  const stubbed = (policy.stubs?.dirs || []).some((d) => rel.startsWith(`${d}/`)) || (policy.stubs?.files || []).includes(rel);
+  if (stubbed) return { included: true, source: `stubs/${rel}`, reason: 'reviewed-replacement' };
+  if ((policy.deny || []).some((pattern) => globRegex(pattern).test(rel))) return { included: false, reason: 'edition-or-internal-deny' };
+  for (const [scope, patterns] of Object.entries(policy.allowOnly || {})) {
+    if (!scope.startsWith('_') && globRegex(scope).test(rel) && !patterns.some((pattern) => globRegex(pattern).test(rel))) return { included: false, reason: `not-allowlisted:${scope}` };
+  }
+  return { included: true, source: rel, reason: 'public-source' };
+}
+
+export function assertPublicOutputPaths(names, policy) {
+  for (const name of names) {
+    if (forbiddenLocalPath(name) || internalPublicPath(name)) throw new Error(`Internal or local file in Public output: ${name}`);
+    if (name === 'PUBLIC_MANIFEST.json') continue;
+    if (name.startsWith('admin-client/dist/')) {
+      if (/(?:HaPage|BackupPage|SecureColumnsPage|MciController|MciTemplate|MciAbbreviations)/i.test(name)) throw new Error(`Enterprise asset in Public output: ${name}`);
+      continue;
+    }
+    const destination = name.startsWith('stubs/') ? name.slice(6) : name;
+    const decision = publicPathDecision(destination, policy);
+    if (!decision.included || (name.startsWith('stubs/') && decision.source !== name)) throw new Error(`Path is outside the Public allowlist: ${name}`);
+  }
+}
+
+/** Return the reviewed source/destination pairs, never falling back to Full bytes. */
 export function publicEntries(root, policy = readPolicy(root)) {
-  const deny = policy.deny.map(globRegex);
-  const keep = (policy.keep || []).map(globRegex);
-  const scopes = Object.entries(policy.allowOnly || {}).filter(([k]) => !k.startsWith('_'))
-    .map(([scope, patterns]) => [globRegex(scope), patterns.map(globRegex)]);
   const entries = [];
   for (const rel of walkFiles(root)) {
-    if (forbiddenLocalPath(rel) || rel.startsWith('admin-client/dist/') || rel.startsWith('stubs/')) continue;
-    const stubbed = (policy.stubs?.dirs || []).some((d) => rel.startsWith(`${d}/`)) || (policy.stubs?.files || []).includes(rel);
-    let source = rel;
-    if (stubbed) {
-      source = `stubs/${rel}`;
-      if (!fs.existsSync(path.join(root, source))) continue;
-    } else if (!keep.some((re) => re.test(rel))) {
-      const scope = scopes.find(([re]) => re.test(rel));
-      if (scope ? !scope[1].some((re) => re.test(rel)) : deny.some((re) => re.test(rel))) continue;
+    const decision = publicPathDecision(rel, policy);
+    if (!decision.included) continue;
+    const source = decision.source;
+    if (!fs.existsSync(path.join(root, source))) {
+      if ((policy.stubs?.files || []).includes(rel)) throw new Error(`Missing reviewed Public replacement: ${rel}`);
+      continue;
     }
     const abs = path.join(root, source);
     if (fs.lstatSync(abs).isSymbolicLink()) throw new Error(`Public output cannot contain symlinks: ${rel}`);

@@ -122,7 +122,7 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
       '  ① MariaDB 를 쓰는 경우 — 아래 두 줄을 실제 값으로 바꿉니다',
       '       DB_USER=aidot',
       '       DB_PASSWORD=여기에_DB_비밀번호      ← 실제 비밀번호로 교체',
-      '     (MariaDB 설치·계정 만들기: docs/GUIDE_01_MARIADB_AND_ENV.md)',
+      '     (MariaDB 설치·계정 만들기: docs/BUILD_AND_RELEASE.md)',
       '',
       '  ② DB 설치 없이 바로 써 보려면 — 한 줄만 바꾸면 됩니다',
       '       DB_TYPE=sqlite',

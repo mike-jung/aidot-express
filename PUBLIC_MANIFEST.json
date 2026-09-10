@@ -1,5 +1,5 @@
 {
-  "version": "1.43.3",
+  "version": "1.43.4",
   "edition": "public",
   "files": [
     {
@@ -24,11 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "73d22c02fcced48729da1978cf723d77dafc85e1b1d8c01c9d0b0c61af31fe1e"
-    },
-    {
-      "path": "RELEASE_NOTES.md",
-      "sha256": "653861255eaf4da4a06a68184ac9ebdaf9ddb17edee0e77eb2beb5449ce81791"
+      "sha256": "fbe20278790c7f02cd85a57e5cd916a505d8605622540a2f389a53dc11f7da1e"
     },
     {
       "path": "admin-client/.gitignore",
@@ -36,7 +32,7 @@
     },
     {
       "path": "admin-client/README.md",
-      "sha256": "cac1c8be491aed3ab591c5bc574aa731fb05236123ae26456735312b0aa94615"
+      "sha256": "a2e85019720eadce08f7a694cc1af371ead013d3737c793889716833eaa8b541"
     },
     {
       "path": "admin-client/edition-plugin.js",
@@ -491,20 +487,12 @@
       "sha256": "56c49bbe15ff99b221a82adf090e8e8c0982c85754430601122210bb01c08978"
     },
     {
-      "path": "apply-hotfix.mjs",
-      "sha256": "ec9bec326f072c77f9d993670b6a6ac3257de5a484127253041f45cac9b8ec2f"
-    },
-    {
-      "path": "build-info.json",
-      "sha256": "d5a877afc8f40c82a34f77dc768738de7c25f1d357812bec418bea2a44e1bbe2"
-    },
-    {
       "path": "docs/ARCHITECTURE.md",
       "sha256": "dd10403510f2576e6719d17039ad94205fbd5fe462289fa3090f067389b49502"
     },
     {
       "path": "docs/BUILD_AND_RELEASE.md",
-      "sha256": "a8f2435927d1e882ec4b9a0db039418536d2a2522fa966f5d7c8b6741641663d"
+      "sha256": "1a9d7ff101e12819014212560bfcd9f8e8c827042c6247b096e004ce390d2e79"
     },
     {
       "path": "docs/LICENSING.md",
@@ -512,27 +500,15 @@
     },
     {
       "path": "docs/SECURITY_OPERATIONS.md",
-      "sha256": "1cf653b784f887f3f86b148514679445942eeda893f9dff00c11d2fd9ffc1b88"
+      "sha256": "a1605d639d2bd19976d5508088d523fb47a405bfb2852c2a38e7c99da71f4820"
     },
     {
-      "path": "docs/UPGRADE_1.43.0.md",
-      "sha256": "1300aaebd6672d9a20e419991148f3b636f66c25d273c8d105c0b3527ccadee4"
-    },
-    {
-      "path": "docs/UPGRADE_1.43.1.md",
-      "sha256": "959bfc41798929bcf1b53dd51d7aa9f7427e3e1896642e9647e33f7b166bf9b9"
-    },
-    {
-      "path": "docs/UPGRADE_1.43.2.md",
-      "sha256": "f2badc73d4fa918cf6feb692d60aac4b15414f78aff6a08915ad72219557c285"
-    },
-    {
-      "path": "docs/UPGRADE_1.43.3.md",
-      "sha256": "8d8a8bc1e09108bd836bdded3071a496181144b1bad4d2a8e1289784e08c2cc2"
+      "path": "docs/UPGRADE.md",
+      "sha256": "16b31c3de8189ee03f007e4241e5a6aada4319af599bb0c2d568d1fe82955a3c"
     },
     {
       "path": "docs/WINDOWS_OPERATIONS.md",
-      "sha256": "a0833a383423595f0afe295be765656ec374e2f20c4fe3904eb6d90fe3ca4251"
+      "sha256": "7cc9ce25271237d06f82eceb6d46cadc7d934f180b2e4449c6f6178dc03b6afe"
     },
     {
       "path": "docs/aidot-express-tutorial-v1.32.0.pdf",
@@ -936,7 +912,7 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "a680bee7994eccfe86aa4e024e081ae37b13069ddf5d530cea6a4832ef6bb8db"
+      "sha256": "10ed24484b6097814d326fcb88a67efdf409f2b3faa165e31bd1de4c12e01b3b"
     },
     {
       "path": "public/demo/guestbook-lab.html",
@@ -971,10 +947,6 @@
       "sha256": "0909efdd241706324292e31d02ec19f600ca1b699396d9de8b5fc20fc76880cf"
     },
     {
-      "path": "scripts/check-i18n-hardcoded.mjs",
-      "sha256": "5d3f8b07c1ca0d44fe16b8a764da3e8f8a8375e6cd464f41fa1d161cc5c7163d"
-    },
-    {
       "path": "scripts/check-i18n.mjs",
       "sha256": "55cf12f2b6e69658ff4816146d9c9a0e3c6115de0fbbc52658889f172a92e725"
     },
@@ -1007,10 +979,6 @@
       "sha256": "88c184dda31015513b906e68eb16bbe9bfbc68d314e045ba918851163285f375"
     },
     {
-      "path": "scripts/e2e.mjs",
-      "sha256": "f3a004b7fcd7f8a57737dbb3c066f0e367062a17783b73890ed4603519c38c90"
-    },
-    {
       "path": "scripts/electron-dev-vite.cjs",
       "sha256": "6d41fb6e690fe9802d59d68589266df301c7f3079a6443d5fb932ae73f1c8897"
     },
@@ -1027,22 +995,6 @@
       "sha256": "694e3eb26a4a50cef75fd45e4a91f56ae0220a691c80e818891add8f44f045ff"
     },
     {
-      "path": "scripts/fetch-deps.mjs",
-      "sha256": "38bf768d7dc63c5e65b7db6743152d3f27257a5deca36178467a2a5c97f092c7"
-    },
-    {
-      "path": "scripts/git-push.mjs",
-      "sha256": "70914922738886e0bbb8de9c8562d848edab659c393cc601ea1c03202188d10d"
-    },
-    {
-      "path": "scripts/git-release.mjs",
-      "sha256": "6523ae2de3367e1f524ae089fec02f7c9dcd265e82258f1aba1c80aaa9ff5360"
-    },
-    {
-      "path": "scripts/i18n-extract.mjs",
-      "sha256": "4f96fc1ebdc7ade79726bb353f116503519262ef71c8d9fbe98c1f46450a5cc6"
-    },
-    {
       "path": "scripts/linux-artifacts.mjs",
       "sha256": "40ea6eaadd976ea80c6158502a517c23da7e224f3bca33b886854502c5521c1e"
     },
@@ -1051,56 +1003,24 @@
       "sha256": "c0c33798df7f99fa2a8b29c2e18c68d51227c2e9cff06a5c2c1aa87b8edb8612"
     },
     {
-      "path": "scripts/publish/export-public.mjs",
-      "sha256": "fab375735d87eb631b6ae725ac644c40bbf993ed4c47a95c6e1b4a506835cb28"
-    },
-    {
       "path": "scripts/publish/pii-scan.mjs",
       "sha256": "438ffbb1017eeffe09421124407d7616574f5735844aadd9a79c2a9426e85708"
     },
     {
       "path": "scripts/publish/policy.mjs",
-      "sha256": "79f8cf02414f376446c69dec3de6a3f6eb1e0a80666a0d14a5c53f225f17c658"
+      "sha256": "63efeecca87980555dfb542a0956e0509faf28dfab1ebffadb3056d29144defa"
     },
     {
       "path": "scripts/publish/public-filter.json",
-      "sha256": "88377b1d7f3b3a3a5ee67a07bf6cdfd724e498352a537dc047de30fcbe3513cc"
-    },
-    {
-      "path": "scripts/publish/sync-public.mjs",
-      "sha256": "862a7efddea704e8b11f3eebbc193d11a37c3ec97f5d8d728826fbb487252f88"
-    },
-    {
-      "path": "scripts/release-all.mjs",
-      "sha256": "38540f632b15743b62c0ec44149f38852f189ce2c26b3b4406895117ac98a9fb"
-    },
-    {
-      "path": "scripts/release.mjs",
-      "sha256": "e59854274bf24dcf00d19c8759c8b0e5954d13ed8197e38edb3c787599c85d0f"
+      "sha256": "aea70b392d137737d2ae945ece753db2dceea5345ad59903227d66b78071a243"
     },
     {
       "path": "scripts/security-e2e.mjs",
       "sha256": "eb694aae63320d769543b0aa80efa6e9e9de855da1b06389f80869d8ee18abea"
     },
     {
-      "path": "scripts/smoke-screens.mjs",
-      "sha256": "9d573ca1528804289caed78041bb52d2bf2748dccb7c1d0546ba6f85e528abf6"
-    },
-    {
       "path": "scripts/start.mjs",
-      "sha256": "c606108981e3a09699daeb45199fee7c124bb42596b14b7f0720edb01d188411"
-    },
-    {
-      "path": "scripts/tutorial/apply-text.mjs",
-      "sha256": "eec26e179acf7b0471868a72b580d048cdc9f4fa0046fa970fc65d3a2039a548"
-    },
-    {
-      "path": "scripts/tutorial/check-overflow.mjs",
-      "sha256": "cf0e1576ff8c1ba1cd128e75156fb201d6dbad34947143946ca935fbaef0babd"
-    },
-    {
-      "path": "scripts/tutorial/extract-text.mjs",
-      "sha256": "6a097e7cf0ecadd5eff668f71e45f6dc1c5d28044264c630ff16bd97e4eae1ce"
+      "sha256": "02e06d245412870a463f8cd7e4621fd65b9041a249c43a4918ff8f411e50fddf"
     },
     {
       "path": "scripts/verify-edition-package.cjs",
@@ -1155,14 +1075,6 @@
       "sha256": "98b9eba15867316682dabc6b451ad736f461ebebd990cbb9f64fb1fc621a7e2f"
     },
     {
-      "path": "src/controller/BloodPressureController.js",
-      "sha256": "c7cf251bca3d32fecadc338d499f039ac01eeddac32ce68f1fb6832f9fae230d"
-    },
-    {
-      "path": "src/controller/BloodSugarController.js",
-      "sha256": "3717e393c9a915f4a559be070ec26d4a8e44496a8318c2dc95a99ca0dd14fb5b"
-    },
-    {
       "path": "src/controller/BookController.js",
       "sha256": "8efdf3daeeb9db0c2f0dedccc43386db31bb3a0054501ca7be5e86965f234220"
     },
@@ -1179,20 +1091,12 @@
       "sha256": "4e81eceb15708ea30e6952b218bc0539d553543bb07519408b08325cb9d79230"
     },
     {
-      "path": "src/controller/PersonController.js",
-      "sha256": "3df9d7ef56be77e6b688f6ad16f90ad1cfb90d90da2e23aa1b229ca2f6e4bb24"
-    },
-    {
       "path": "src/controller/StudentController.js",
       "sha256": "df22d53976763b1fb40f3b48fb1d13bd394b0c59937e0d81760d0cbb58aaf923"
     },
     {
       "path": "src/controller/UploadController.js",
       "sha256": "b8abf0cc000d32e7ba571fb1cd946f5eec097d8be08810be9a70f6b80330dbc3"
-    },
-    {
-      "path": "src/controller/WeightController.js",
-      "sha256": "dc94bf1e899c7820f1335f16ca1baa7cc153d82bf2ce2611ff742cd49c51497f"
     },
     {
       "path": "src/controller/meta/AuthController.meta.json",
@@ -1419,10 +1323,6 @@
       "sha256": "440eb6f7a5a76ee311e4e8840e6db9b298e6330c35ab4768edf214653ab0ae17"
     },
     {
-      "path": "src/database/migrations/009_samples_deprecated.sql",
-      "sha256": "4cbee211e732c218aeac4a6b1856b4f0face8110f7333e42feb1f3e84de3a876"
-    },
-    {
       "path": "src/database/migrations/009_user_token_version.sql",
       "sha256": "bd2aaadb8610314c5dda11bd58d21f4761e52b75add10109698c8278a9c6e3f2"
     },
@@ -1459,14 +1359,6 @@
       "sha256": "4622870ec8cc41c048ef2df5c07199ab87c33e7c1ce71593b80f00930fb92ff4"
     },
     {
-      "path": "src/database/sql/bloodPressure.sql",
-      "sha256": "07ff1f211107c117a9e3af1627a6f851bfe2ec6e58a169612e0cb51e6315da3e"
-    },
-    {
-      "path": "src/database/sql/bloodSugar.sql",
-      "sha256": "142dfc9de8eba982a404d5fde49b32e441e442f308d59c8fb5e1cd688b712d7f"
-    },
-    {
       "path": "src/database/sql/book.sql",
       "sha256": "9079b2a62b7231a9a54c68fc18c5b7d3bc2ead3988813599cd09216e8a74e1dd"
     },
@@ -1475,20 +1367,12 @@
       "sha256": "e511f8fc53bde9278d6e79373ba9ef7cf726975bc847776a505f558e5550ebf2"
     },
     {
-      "path": "src/database/sql/person.sql",
-      "sha256": "d46b2b695670e9389a0dd2028fec729cdb56e1c0a07451d8e2cede0f097abeba"
-    },
-    {
       "path": "src/database/sql/student.sql",
       "sha256": "5ebfc64d7e4f91801fa5a82c4c2a7b07ff6051377745ac5b85bc9775682df068"
     },
     {
       "path": "src/database/sql/user.sql",
       "sha256": "77639836be4187e5f1f196e4e7cdbc0e4fcb9fa5b82d92074f0d95becad8748a"
-    },
-    {
-      "path": "src/database/sql/weight.sql",
-      "sha256": "cf201dbd5a5183c7bd50fad205c04b9c81d9d5959bea06926c928d168041dda4"
     },
     {
       "path": "src/database/sqlite-adapter.js",
@@ -1567,14 +1451,6 @@
       "sha256": "650d5f4d1359fd7df584b08136c4a58ee426aefea2ade0e093e562f6f10e08b2"
     },
     {
-      "path": "src/service/BloodPressureService.js",
-      "sha256": "0b4bec75418d1e1257f9361e7d651c155dfbfe9a0f267af92afca71f85120d86"
-    },
-    {
-      "path": "src/service/BloodSugarService.js",
-      "sha256": "3c9f3f12d3f51a2f2c76cb6c6796e810414cf0b8f8b795cd48e2993afbae522c"
-    },
-    {
       "path": "src/service/BookService.js",
       "sha256": "413b20a237aaba528445e64f353e2d58d3134158b2215f70aaa421d572c895dd"
     },
@@ -1583,16 +1459,8 @@
       "sha256": "1a6794c92fee975c2e16c2d406ba6677e1b5f4414d6bf746ddf8bc9533e0b022"
     },
     {
-      "path": "src/service/PersonService.js",
-      "sha256": "7f5f6480852a27e407c492b6c02d30d2c3e784b8ad76b7e4dc175f40a9c630c2"
-    },
-    {
       "path": "src/service/StudentService.js",
       "sha256": "7ccfa2756ce012d30253e73dd9c154fa380bff5f117897d0b1c57ca31b196150"
-    },
-    {
-      "path": "src/service/WeightService.js",
-      "sha256": "f9d6f07c53637646869885c5b898c0e5739f7b4a99e1532c7b91857b2273d6a8"
     },
     {
       "path": "src/service/meta/AuthService.meta.json",
@@ -1695,16 +1563,12 @@
       "sha256": "f34b705abea901df84284ba0cabd928ef29cf01120efa133d109f3773ff03def"
     },
     {
-      "path": "verification.json",
-      "sha256": "f6c390b1fb6e4e6539d88e7b6ab479d9a17073b0e433c2782b9f86a690a81c15"
-    },
-    {
       "path": "workspace/README.md",
       "sha256": "800186aeb71c6fd093b5dc80d75cfea7783d9a37c13788d910d9e1f938708155"
     },
     {
       "path": "admin-client/dist/aidot-edition.json",
-      "sha256": "a082ef8b6f86f375e1365c330ee3a799eb1de7397ac7c7be3615f9a93434a693"
+      "sha256": "c1c5beefbe7914eee46aac91ec9b6bd869e70df367741f92ebce2ae72f46ece3"
     },
     {
       "path": "admin-client/dist/assets/AccessStatsPage-DJRYTejQ.css",
@@ -2091,6 +1955,26 @@
       "sha256": "67a53261d408f361e1fe4d94a89c265f1267599870e03815fb317d58680523c1"
     },
     {
+      "path": "stubs/README.md",
+      "sha256": "fbe20278790c7f02cd85a57e5cd916a505d8605622540a2f389a53dc11f7da1e"
+    },
+    {
+      "path": "stubs/docs/BUILD_AND_RELEASE.md",
+      "sha256": "1a9d7ff101e12819014212560bfcd9f8e8c827042c6247b096e004ce390d2e79"
+    },
+    {
+      "path": "stubs/docs/SECURITY_OPERATIONS.md",
+      "sha256": "a1605d639d2bd19976d5508088d523fb47a405bfb2852c2a38e7c99da71f4820"
+    },
+    {
+      "path": "stubs/docs/UPGRADE.md",
+      "sha256": "16b31c3de8189ee03f007e4241e5a6aada4319af599bb0c2d568d1fe82955a3c"
+    },
+    {
+      "path": "stubs/docs/WINDOWS_OPERATIONS.md",
+      "sha256": "7cc9ce25271237d06f82eceb6d46cadc7d934f180b2e4449c6f6178dc03b6afe"
+    },
+    {
       "path": "stubs/lib/admin/service/BackupService.js",
       "sha256": "be429d5dbaa27d885affe7ab1cd96649822764a4402cea885b279b394706338f"
     },
@@ -2152,11 +2036,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "a02b4a5c09b0d5846924d09885c904aa01ead0c06b78af28aa0f86d884f7ae37"
+      "sha256": "d9c9c695ce965904db9ee9e8bb7ab0329ad1dcba48c9f2cd8e9335f5467363a7"
     },
     {
       "path": "admin-client/package.json",
-      "sha256": "272e64f573bf7877a5c78da4901222a6d07898fcb4fa12b9976a82a500432df0"
+      "sha256": "27df5e7a2f822dcdc7c0be904249b12503566f6efeb5c407ad942875e67b5a10"
     }
   ]
 }

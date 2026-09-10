@@ -1,7 +1,9 @@
 {
   "_comment": [
     "Public distribution policy shared by source export and Electron builds.",
-    "Enterprise implementations are replaced with stubs before keep/deny processing."
+    "Enterprise implementations and Full operator guides use explicitly reviewed replacements.",
+    "Root files, authoring areas and npm commands are allowlisted. Unknown files in those areas are private by default.",
+    "Public README and operator guides use reviewed replacements; Full upgrade and publishing instructions stay in Full."
   ],
   "deny": [
     "mci-server/**",
@@ -31,7 +33,6 @@
     ".env.secure.example",
     "**/.env",
     "**/.env.local",
-    "workspace/**",
     "dist-electron/**",
     "log/**",
     "data/**",
@@ -42,7 +43,6 @@
     "CHANGELOG.md",
     "APPLY-PATCH.md",
     "docs/PUBLISHING.md",
-    "scripts/publish/**",
     "scripts/mci-*",
     "scripts/ha-*",
     "scripts/backup-*",
@@ -62,16 +62,17 @@
     "admin-client/dist/**",
     "admin-client/dist-public/**",
     "docs/REVIEW_1.43.0_KO.md",
-    "public/assets/**"
-  ],
-  "keep": [
-    "workspace/README.md",
-    "admin-client/vite.public.js",
-    "scripts/publish/policy.mjs",
-    "scripts/publish/public-filter.json",
-    "scripts/publish/pii-scan.mjs",
+    "public/assets/**",
+    "scripts/git-*.mjs",
+    "scripts/release*.mjs",
     "scripts/publish/export-public.mjs",
-    "scripts/publish/sync-public.mjs"
+    "scripts/publish/sync-public.mjs",
+    "scripts/tutorial/**",
+    "src/controller/{BloodPressure,BloodSugar,Weight,Person}Controller.js",
+    "src/service/{BloodPressure,BloodSugar,Weight,Person}Service.js",
+    "src/database/sql/{bloodPressure,bloodSugar,weight,person}.sql",
+    "src/database/migrations/009_samples_deprecated.sql",
+    "public/uploads/**"
   ],
   "scan": {
     "_comment": [
@@ -83,7 +84,6 @@
   },
   "scanExempt": [
     "scripts/publish/**",
-    "CHANGELOG.md",
     "docs/LICENSING.md",
     "src/config/default.js",
     "src/config/index.js"
@@ -91,21 +91,17 @@
   "maxDataFileBytes": 51200,
   "allowOnly": {
     "_comment": [
-      "docs/ is inverted on purpose. A deny list there would need editing every time",
-      "someone adds a design note, and the one that gets forgotten is the one that leaks.",
-      "Only finished, reader-facing material ships."
+      "All matching scopes apply. Explicit deny rules take precedence over allowOnly; Enterprise and documentation replacements must be declared as stubs."
     ],
     "docs/**": [
-      "docs/aidot-express-tutorial-*.pdf",
-      "docs/LICENSING.md",
-      "docs/SECURITY_OPERATIONS.md",
-      "docs/UPGRADE_1.43.0.md",
       "docs/ARCHITECTURE.md",
+      "docs/LICENSING.md",
       "docs/BUILD_AND_RELEASE.md",
-      "docs/UPGRADE_1.43.1.md",
-      "docs/UPGRADE_1.43.2.md",
-      "docs/UPGRADE_1.43.3.md",
-      "docs/WINDOWS_OPERATIONS.md"
+      "docs/SECURITY_OPERATIONS.md",
+      "docs/UPGRADE.md",
+      "docs/WINDOWS_OPERATIONS.md",
+      "docs/aidot-express-tutorial-v1.32.0.pdf",
+      "docs/aidot-express-tutorial-v1.32.0_ko.pdf"
     ],
     "tests/**": [
       "tests/security-hardening.test.mjs",
@@ -114,6 +110,69 @@
       "tests/route-collision.test.mjs",
       "tests/table-prefix.test.mjs",
       "tests/migration-recover.test.mjs"
+    ],
+    "*": [
+      ".env.example",
+      ".gitattributes",
+      ".gitignore",
+      "LICENSE",
+      "NOTICE",
+      "README.md",
+      "package.json",
+      "package-lock.json",
+      "tsconfig.json"
+    ],
+    "scripts/**": [
+      "scripts/start.mjs",
+      "scripts/build-edition.mjs",
+      "scripts/build-linux.mjs",
+      "scripts/linux-artifacts.mjs",
+      "scripts/ensure-build-deps.mjs",
+      "scripts/verify-edition-package.cjs",
+      "scripts/verify-packed-edition.cjs",
+      "scripts/verify-env.mjs",
+      "scripts/electron-dev.cjs",
+      "scripts/electron-dev-vite.cjs",
+      "scripts/electron-smoke.cjs",
+      "scripts/logs.mjs",
+      "scripts/check-syntax.mjs",
+      "scripts/check-vue-refs.mjs",
+      "scripts/check-self-calls.mjs",
+      "scripts/check-sql-names.mjs",
+      "scripts/check-sfc.mjs",
+      "scripts/check-render.mjs",
+      "scripts/check-i18n.mjs",
+      "scripts/check-vue-trace.py",
+      "scripts/security-e2e.mjs",
+      "scripts/publish/policy.mjs",
+      "scripts/publish/public-filter.json",
+      "scripts/publish/pii-scan.mjs",
+      "scripts/windows/aidot-express.xml",
+      "scripts/windows/install-service.ps1",
+      "scripts/windows/uninstall-service.ps1"
+    ],
+    "workspace/**": [
+      "workspace/README.md"
+    ],
+    "public/**": [
+      "public/favicon.svg",
+      "public/index.html",
+      "public/demo/guestbook-lab.html",
+      "public/demo/upload-lab.html",
+      "public/vendor/bootstrap.min.css",
+      "public/vendor/vue.esm-browser.prod.js"
+    ],
+    "admin-client/**": [
+      "admin-client/.gitignore",
+      "admin-client/README.md",
+      "admin-client/package.json",
+      "admin-client/package-lock.json",
+      "admin-client/index.html",
+      "admin-client/edition-plugin.js",
+      "admin-client/vite.config.js",
+      "admin-client/vite.public.js",
+      "admin-client/src/**",
+      "admin-client/public/**"
     ]
   },
   "warn": {
@@ -138,7 +197,56 @@
       "src/secure"
     ],
     "files": [
-      "lib/admin/service/BackupService.js"
+      "lib/admin/service/BackupService.js",
+      "README.md",
+      "docs/BUILD_AND_RELEASE.md",
+      "docs/UPGRADE.md",
+      "docs/WINDOWS_OPERATIONS.md",
+      "docs/SECURITY_OPERATIONS.md"
     ]
-  }
+  },
+  "sourceRoots": [
+    "admin-client",
+    "docs",
+    "electron",
+    "lib",
+    "public",
+    "scripts",
+    "src",
+    "tests",
+    "workspace"
+  ],
+  "publicScripts": [
+    "start",
+    "start:server",
+    "start:main",
+    "dev",
+    "check",
+    "test",
+    "test:electron",
+    "electron:dev",
+    "electron:dev:vite",
+    "build:admin",
+    "build:electron",
+    "dist:win",
+    "dist:win:ia32",
+    "pack",
+    "check:vue",
+    "check:sfc",
+    "check:render",
+    "check:ui",
+    "logs",
+    "check:i18n",
+    "check:env",
+    "check:refs",
+    "check:self",
+    "check:sqlnames",
+    "dist:linux",
+    "dist:all",
+    "license:report",
+    "ensure:deps",
+    "check:security",
+    "test:security:e2e",
+    "electron:install"
+  ]
 }

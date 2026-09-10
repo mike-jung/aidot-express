@@ -3,7 +3,7 @@
 The browser console for aidot-express. Vue 3 + Vite + Pinia + Bootstrap 5 + CodeMirror 6.
 
 You do not need to build this separately to use aidot-express — `npm start` in the project
-root serves the console from `public/`. This folder is only for working on the console
+root serves the console from `admin-client/dist`. This folder is only for working on the console
 itself.
 
 ## Running it in dev mode
@@ -44,16 +44,19 @@ npm run build            # from here
 npm run build:admin      # from the project root — same thing
 ```
 
-Output goes to `dist/`. The release build copies it into `public/`, which is what the
-server actually serves.
+The runtime serves `admin-client/dist`. The project-root Public build produces
+`dist-public` for packaging. In an exported Public tree, the local build command
+uses the Public Vite config and writes `dist`.
 
 ## Signing in
 
 The first admin account is created for you on first start — `admin` / `admin1234` in
 development. The console will keep telling you to change it until you do.
 
-In production the server prints a one-time random password to stderr instead. See
-`AUTH_*` in `.env.example`.
+For production, set `ADMIN_INITIAL_PASSWORD` before first start. If omitted on a
+fresh database, the generated initial credential is stored in the protected local
+data directory and shown by the desktop setup flow; it is not printed in server
+logs. See [Security operations](../docs/SECURITY_OPERATIONS.md).
 
 ## Layout
 
@@ -69,7 +72,7 @@ src/
 
 ## Adding a string
 
-Both locale files must have the same keys. `npm run check` in the project root fails if
+Both locale files must have the same keys. `npm run check:i18n` in the project root fails if
 they drift:
 
 ```
@@ -82,7 +85,7 @@ From the project root:
 
 ```bash
 npm run check:sfc     # every .vue actually compiles
-npm run smoke         # opens every screen in a real browser, fails on console errors
+npm run check:i18n    # compare locale keys
 ```
 
-The smoke test exists because syntax checks kept passing while a screen was broken.
+Also check the running console in a browser after changing screen behavior.
