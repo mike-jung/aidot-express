@@ -56,22 +56,14 @@ process.on('SIGINT', () => killAll(0));
 process.on('SIGTERM', () => killAll(0));
 
 (async () => {
-  // 0) 프로젝트 .env 에서 실제 Express 서버 포트 추출 → Vite 에 전달.
-  //    이렇게 하면 사용자가 .env 의 PORT 를 바꿔도 Vite proxy 가 자동 동기화됨.
-  let apiTarget = process.env.VITE_API_TARGET;
-  if (!apiTarget) {
-    try {
-      const fs = require('node:fs');
-      const envPath = path.join(projectRoot, '.env');
-      if (fs.existsSync(envPath)) {
-        const m = fs.readFileSync(envPath, 'utf8').match(/^\s*PORT\s*=\s*(\d+)\s*$/m);
-        if (m) apiTarget = `http://localhost:${m[1]}`;
-      }
-    } catch (_) { /* noop */ }
-  }
-  if (apiTarget) {
-    console.log(`[launcher] Express server port detected: ${apiTarget}`);
-  }
+  const transport = require('../src/core/transport.cjs');
+  const settingsFile = require('../src/core/httpsConfig.cjs');
+  const file = settingsFile.envPath(projectRoot);
+  const env = { ...process.env, ...settingsFile.readEnv(file) };
+  const prepared = transport.prepareTls(transport.tlsFromEnv(env), path.dirname(file));
+  const apiTarget = process.env.VITE_API_TARGET || transport.urlFor(prepared.protocol, '127.0.0.1', env.PORT || env.SERVER_PORT || 3000);
+  const devUrl = transport.urlFor(prepared.protocol, prepared.hostname, 5174);
+  console.log(`[launcher] API: ${apiTarget}; console: ${devUrl}`);
 
   // 1) Vite dev 서버 시작 — admin-client 폴더에서
   const viteCmd = isWin ? 'npm.cmd' : 'npm';
@@ -80,6 +72,7 @@ process.on('SIGTERM', () => killAll(0));
     stdio: ['ignore', 'inherit', 'inherit'],
     env: {
       ...process.env,
+      AIDOT_ENV_FILE: file,
       FORCE_COLOR: '1',
       ...(apiTarget ? { VITE_API_TARGET: apiTarget } : {}),
     },
@@ -93,7 +86,7 @@ process.on('SIGTERM', () => killAll(0));
   // 2) Vite 포트 LISTEN 대기 — vite.config.js 의 port 는 5174
   const VITE_HOST = '127.0.0.1';
   const VITE_PORT = 5174;
-  console.log(`[launcher] waiting for the Vite dev server (http://${VITE_HOST}:${VITE_PORT}) ...`);
+  console.log(`[launcher] waiting for the Vite dev server (${devUrl}) ...`);
   const ready = await waitForPort(VITE_HOST, VITE_PORT, 30_000);
   if (!ready) {
     console.error('[launcher] the Vite dev server did not start within 30s.');
@@ -109,7 +102,8 @@ process.on('SIGTERM', () => killAll(0));
     stdio: 'inherit',
     env: {
       ...process.env,
-      VITE_DEV_URL: `http://${VITE_HOST}:${VITE_PORT}`,
+      AIDOT_ENV_FILE: file,
+      VITE_DEV_URL: devUrl,
     },
   });
   children.push(electron);

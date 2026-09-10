@@ -33,7 +33,7 @@
  *    이벤트를 <logDir>/supervisor-events.jsonl 에 한 줄씩 남기고, 기동 때 마지막 50건을 읽어
  *    콘솔 대시보드가 supervisor 를 다시 띄운 뒤에도 이력을 볼 수 있게 한다.
  */
-import http from 'node:http';
+import transport from './core/transport.cjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dumpHungProcess } from './hangDump.js';
@@ -249,7 +249,7 @@ export class Watchdog {
   /** GET /health/live — 타임아웃 · 거부 · 상태코드를 구분해 돌려준다 */
   _probe() {
     return new Promise((resolve) => {
-      const req = http.request({
+      const req = transport.localRequest(this.sup.transport, {
         host: '127.0.0.1', port: this.sup.mainPort, path: '/health/live', method: 'GET',
         timeout: this.cfg.timeoutMs, agent: false,
       }, (res) => {

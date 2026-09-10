@@ -2,7 +2,7 @@
   aidot-express Windows 서비스 정의 (WinSW)
 
   왜 서비스로 올리나
-    Electron 창 안에서 서버를 띄우면, 창을 닫거나 Electron 이 죽는 순간 서버도 같이 사라진다.
+    Electron이 소유한 서버는 앱의 종료·장애에 영향을 받는다. 창 닫기는 트레이로 숨기는 동작이다.
     서비스로 올리면 OS(SCM) 가 서버를 관리한다 — 로그인 전에도 뜨고, 죽으면 OS 가 되살린다.
     Electron 은 "보는 창" 일 뿐이다.
 
@@ -17,13 +17,13 @@
 
   <!-- 설치 위치 기준. install-service.ps1 이 %BASE% 를 실제 경로로 채운다 -->
   <executable>%BASE%\node\node.exe</executable>
-  <arguments>src\supervisor.js</arguments>
+  <arguments>--import ./src/loader/register.mjs src/supervisor.js</arguments>
   <workingdirectory>%BASE%</workingdirectory>
 
   <env name="NODE_ENV" value="production"/>
   <env name="AIDOT_ENV_FILE" value="%BASE%\.env"/>
 
-  <!-- ★ 실패 시 1분 후 다시 시작 — 세 번까지. 그 뒤에도 실패하면 리셋 주기(하루) 뒤 다시 센다 -->
+  <!-- WinSW configures SCM recovery actions. The last restart action repeats on further failures. -->
   <onfailure action="restart" delay="1 min"/>
   <onfailure action="restart" delay="1 min"/>
   <onfailure action="restart" delay="1 min"/>

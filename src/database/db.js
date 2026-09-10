@@ -59,7 +59,7 @@ function resolveSqliteFile() {
   //  ⚠ v1.2.0: electron/server-bridge.cjs 는 ELECTRON_USER_DATA_PATH 로 주입하는데
   //     여기서는 ELECTRON_USER_DATA 만 읽어서, 패키징 설치본의 app.db 가 userData 가 아니라
   //     설치 폴더(resources/app/data) 에 생성되고 있었다 (업그레이드/재설치 시 데이터 유실).
-  const userData = process.env.ELECTRON_USER_DATA_PATH || process.env.ELECTRON_USER_DATA;
+  const userData = process.env.AIDOT_DATA_DIR || process.env.ELECTRON_USER_DATA_PATH || process.env.ELECTRON_USER_DATA;
   if (userData) return path.join(userData, 'app.db');
   return path.resolve(projectRoot, 'data', 'app.db');
 }

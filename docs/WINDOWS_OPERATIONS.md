@@ -53,3 +53,7 @@ For a development Electron executable, run `npm ci`, `npm run electron:install`
 and then `npm run electron:dev`. Workspace settings accept ordinary project-relative
 folders; framework directories, absolute paths, reserved names and linked paths
 are rejected. See [Build and run](BUILD_AND_RELEASE.md).
+
+## Independent server packages (1.45.0)
+
+See [SERVER_INSTALL.md](SERVER_INSTALL.md) for the supported Node.js service packaging path. It avoids Electron runtime dependencies and separates application versions from configuration and data.

@@ -1,5 +1,8 @@
+const transport = require('../src/core/transport.cjs');
+const httpsConfig = require('../src/core/httpsConfig.cjs');
+const externalServer = require('./external-server.cjs');
 const { ensureEnvSecret } = require('../src/core/secretPolicy.cjs');
-const { sameOrigin, assertSender, trustedSender, lockLocalWindow, validateSetup, parseAttachPort, envLine } = require('./security.cjs');
+const { sameOrigin, assertSender, trustedSender, lockLocalWindow, validateSetup, envLine } = require('./security.cjs');
 /**
  * Aidot Express — Electron main process.
  *
@@ -77,18 +80,15 @@ function migrateLegacyUserData() {
 
 const { startServerProcess, stopServerProcess } = require('./server-bridge.cjs');
 
+let serverTransport = { enabled: false, protocol: 'http', hostname: '127.0.0.1', certificate: null };
+const serverUrl = () => transport.urlFor(serverTransport.protocol, serverTransport.hostname, serverPort);
 let serverExternal = false;   // ★ v1.24.0 — 서비스에 붙은 경우: 우리가 띄운 것이 아니므로 끌 때 건드리지 않는다
 
 /** 그 포트에 aidot-express 가 이미 살아 있는가 (짧게 두드려 본다) */
 function probeExternalServer(port) {
-  return new Promise((resolve) => {
-    const req = require('node:http').request(
-      { host: '127.0.0.1', port, path: '/health/live', method: 'GET', timeout: 1500 },
-      (res) => { res.resume(); resolve(res.statusCode === 200); },
-    );
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
-    req.end();
+  return externalServer.probeConnection({ ...serverTransport, port }).then(prepared => {
+    serverTransport = prepared;
+    return true;
   });
 }
 
@@ -210,6 +210,14 @@ app.on('second-instance', () => {
 // "모든 창을 닫아도 앱 종료 안함" — 트레이로 남김
 app.on('window-all-closed', () => {
   // 명시적으로 아무것도 안 함
+});
+
+// A window close may keep the tray alive; an application quit must finish.
+// Route OS/menu/API quits through the same owned-server shutdown sequence.
+app.on('before-quit', (event) => {
+  if (isQuitting) return;
+  event.preventDefault();
+  doQuit();
 });
 
 /* ─────────────────────────── 실행 플로우 ─────────────────────────── */
@@ -392,44 +400,29 @@ app.whenReady().then(async () => {
   try {
     showSplash();
 
-    // 0) 레거시 userData 폴더 마이그레이션 (spring-like-node-server → Aidot Express)
-    migrateLegacyUserData();
-
-    // 0-1) .env 가 없으면 만들고, 접속 정보를 물어본다.
-    //      틀린 정보로 서버를 띄워 죽는 것보다, 시작 전에 받아 두는 편이 낫다.
-    /* 순서가 중요하다:
-         ① 인스톨러가 쓴 값을 가져온다 (설치 중에 입력한 DB 정보)
-         ② 그래도 없으면 본보기에서 만든다
-         ③ ①도 아니고 처음이면 물어본다 */
-    const adopted = adoptInstallerEnv();
-    const first = !adopted && isFirstRun();
-    const envPath = ensureUserEnv();
-    if (first) {
-      if (splashWin && !splashWin.isDestroyed()) splashWin.hide();
-      await showSetupWindow(envPath);
-      if (splashWin && !splashWin.isDestroyed()) splashWin.show();
+    const clientFile = httpsConfig.envPath(process.cwd(), { ...process.env, ELECTRON_USER_DATA_PATH: app.getPath('userData') });
+    const connection = externalServer.loadConnection({ envFile: clientFile });
+    // Service clients do not migrate server data, ask for DB credentials or create server secrets.
+    if (!connection) {
+      migrateLegacyUserData();
+      const adopted = adoptInstallerEnv();
+      const first = !adopted && isFirstRun();
+      const envPath = ensureUserEnv();
+      if (first) {
+        if (splashWin && !splashWin.isDestroyed()) splashWin.hide();
+        await showSetupWindow(envPath);
+        if (splashWin && !splashWin.isDestroyed()) splashWin.show();
+      }
     }
-
-    // 1) 인스톨러가 resources/.env 에 썼지만 userData/.env 가 아직 없으면 복사.
-    //    이렇게 해서 "설정 변경은 userData/.env 에서만" 이라는 단일 진실 원칙을 유지하고,
-    //    설치 직후 최초 기동 시엔 인스톨러가 입력받은 값을 그대로 사용한다.
-
-    // 2) 서버 자식 프로세스 시작 & ready 대기
     const t0 = Date.now();
-
-    /* ★ v1.24.0 — **이미 떠 있는 서버(Windows 서비스)가 있으면 붙기만 한다.**
-     *
-     *  서버를 Windows 서비스로 올리면 OS 가 관리한다 — 로그인 전에도 뜨고, 죽으면 OS 가 되살린다.
-     *  그 구성에서 Electron 이 서버를 또 띄우면 포트가 겹쳐 실패하거나, 창을 닫을 때
-     *  서비스 서버까지 내리는 사고가 난다. 그래서 AIDOT_SERVER_PORT를 명시했을 때만 해당 서비스에 연결한다.
-     *  (scripts/windows/install-service.ps1 로 올린 서비스가 이 경우다) */
-    const externalPort = parseAttachPort(process.env.AIDOT_SERVER_PORT);
+    const externalPort = connection?.port ?? null;
+    if (connection) serverTransport = connection;
     const external = externalPort !== null && await probeExternalServer(externalPort);
     if (externalPort !== null && !external) throw new Error('The explicitly selected Aidot server is unavailable');
     let result;
     if (external) {
       console.log(`[electron] 이미 떠 있는 서버에 붙습니다 (:${externalPort}) — 서비스로 운영 중`);
-      result = { proc: null, port: externalPort, external: true };
+      result = { proc: null, port: externalPort, external: true, ...serverTransport };
     } else {
       result = await startServerProcess({
         onLog: (line) => console.log('[server]', line),
@@ -438,6 +431,13 @@ app.whenReady().then(async () => {
     }
     serverProc = result.proc;
     serverPort = result.port;
+    serverTransport = { enabled: result.protocol === 'https', protocol: result.protocol || 'http', hostname: result.hostname || '127.0.0.1', certificate: result.certificate };
+    if (!result.external && serverTransport.enabled) {
+      const names = transport.certificateHosts(serverTransport);
+      const loopbackName = ['localhost', '127.0.0.1'].find(host => names.includes(host));
+      if (!loopbackName) throw new Error('An embedded Electron server certificate must include localhost or 127.0.0.1 in its SAN. Generate a certificate with localhost included.');
+      serverTransport.hostname = loopbackName;
+    }
     serverExternal = !!result.external;
     serverReady = true;
     const elapsed = Date.now() - t0;
@@ -573,7 +573,7 @@ function rebuildTrayMenu() {
     { label: '콘솔 열기', click: showMainWindow },
     {
       label: '브라우저에서 열기',
-      click: () => shell.openExternal(`http://localhost:${serverPort}/`),
+      click: () => shell.openExternal(serverUrl()),
     },
     { type: 'separator' },
     { label: '개발자 도구', click: toggleDevTools, visible: isDev() },
@@ -616,7 +616,14 @@ function createMainWindow() {
   });
 
   // VITE_DEV_URL 환경변수가 설정되어 있으면 Vite dev 서버(HMR 가능) 를 로드.
-  const targetUrl = VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`;
+  const targetUrl = VITE_DEV_URL || serverUrl();
+  const allowedTlsHosts = [serverTransport.hostname];
+  if (VITE_DEV_URL) allowedTlsHosts.push(new URL(VITE_DEV_URL).hostname);
+  mainWin.webContents.session.setCertificateVerifyProc((request, callback) => {
+    // Trust only the configured leaf, for the expected origin hostname and validity period.
+    // Every other certificate retains Chromium's normal verification result.
+    callback(transport.acceptsConfiguredCertificate(serverTransport, request.hostname, request.certificate.data, allowedTlsHosts) ? 0 : -3);
+  });
   loadMainUrl();
 
   if (VITE_DEV_URL) {
@@ -690,7 +697,7 @@ function createMainWindow() {
 /** 현재 window 에 URL 을 로드 (실패해도 did-fail-load 에서 에러 페이지 표시). */
 function loadMainUrl() {
   if (!mainWin || mainWin.isDestroyed()) return;
-  const targetUrl = VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`;
+  const targetUrl = VITE_DEV_URL || serverUrl();
   mainWin.loadURL(targetUrl).catch((e) => {
     console.error(`[electron] loadURL reject: ${e.message}`);
   });
@@ -837,25 +844,36 @@ function isSafeExternalUrl(url) {
 
 /** 앱 창 안에서 이동해도 되는 URL 인가 — 로컬 서버(loopback) 와 Vite dev 서버, 내부 에러 페이지만 */
 function isAllowedInternalUrl(url) {
-  return sameOrigin(url, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
+  return sameOrigin(url, VITE_DEV_URL || serverUrl());
 }
 
 /* ─────────────────────────── IPC (preload 에서 사용) ─────────────────────────── */
 
 ipcMain.handle('app:info', (event) => {
-  assertSender(event, mainWin, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
+  assertSender(event, mainWin, VITE_DEV_URL || serverUrl());
   return ({
   name: APP_NAME,
   version: app.getVersion(),
   port: serverPort,
+  protocol: serverTransport.protocol,
+  serverExternal,
   serverReady,
   isDev: isDev(),
 });
 });
 
 ipcMain.handle('app:open-external', (event, url) => {
-  assertSender(event, mainWin, VITE_DEV_URL || `http://127.0.0.1:${serverPort}/`);
+  assertSender(event, mainWin, VITE_DEV_URL || serverUrl());
   if (isSafeExternalUrl(url)) return shell.openExternal(url);
   console.warn(`[electron] 차단된 openExternal 요청: ${url}`);
   return false;
+});
+
+// A local, sender-validated app operation. The renderer cannot run arbitrary commands.
+ipcMain.handle('app:restart', (event) => {
+  assertSender(event, mainWin, VITE_DEV_URL || serverUrl());
+  if (serverExternal) throw new Error('Restart the external service to apply HTTPS settings');
+  app.relaunch();
+  setImmediate(() => doQuit());
+  return true;
 });

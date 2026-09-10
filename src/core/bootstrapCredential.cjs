@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function credentialFile(directory = process.env.ELECTRON_USER_DATA || path.resolve(__dirname, '../../data')) {
+function credentialFile(directory = (process.env.AIDOT_DATA_DIR || process.env.ELECTRON_USER_DATA) || path.resolve(__dirname, '../../data')) {
   return path.join(directory, 'initial-admin-credentials.json');
 }
 function saveInitialCredential({ username, password }, directory) {

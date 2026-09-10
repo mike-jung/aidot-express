@@ -19,6 +19,7 @@ import { useI18n } from '../composables/useI18n';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
 import http from '../api/http';
+import { controlApiBase } from '../utils/apiUrl.js';
 import CodeEditor from '../components/CodeEditor.vue';
 
 import { useDuration } from '../utils/duration';   // ★ v1.19.0
@@ -35,17 +36,18 @@ const { fmtDuration, fmtInterval } = useDuration();
 const auth = useAuthStore();
 
 /* ========== Control base URL 결정 ========== */
-function resolveControlBase() {
-  const manual = typeof localStorage !== 'undefined' && localStorage.getItem('ctrlBaseUrl');
-  if (manual) return manual;
-  const env = (import.meta.env && import.meta.env.VITE_CONTROL_BASE_URL) || '';
-  if (env) return env;
-  try {
-    const loc = window.location;
-    return `${loc.protocol}//${loc.hostname}:7902`;
-  } catch { return 'http://127.0.0.1:7902'; }
+const controlBase = ref('');
+async function resolveControlBase() {
+  const metadata = (await http.get('/api/admin/config/transport')).data.data;
+  if (!metadata.controlPort) throw new Error('The Control server is disabled');
+  // During Vite development, use its verified same-origin proxy.
+  if (import.meta.env.DEV && !localStorage.getItem('ctrlBaseUrl') && !import.meta.env.VITE_CONTROL_BASE_URL) {
+    controlBase.value = window.location.origin;
+    return;
+  }
+  const override = localStorage.getItem('ctrlBaseUrl') || import.meta.env.VITE_CONTROL_BASE_URL || '';
+  controlBase.value = controlApiBase(metadata, window.location.origin, override);
 }
-const controlBase = ref(resolveControlBase());
 
 /** control 용 axios 인스턴스 — 메인 API 와는 다른 baseURL.
  *  메인과 동일한 JWT 를 Authorization 헤더로 전달 (config.auth.accessSecret 공유). */
@@ -78,6 +80,7 @@ async function loadStatus() {
   loading.value = true;
   error.value = null;
   try {
+    if (!controlBase.value) await resolveControlBase();
     const r = await ctrlHttp.value.get('/api/control/status');
     status.value = r.data?.data || null;
   } catch (e) {

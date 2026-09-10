@@ -3,6 +3,7 @@ export default {
   server: {
     port: 3000,
     host: '0.0.0.0',
+    tls: { enabled: false, keyFile: '', certFile: '', caFile: '', passphrase: '', serverName: '' },
     headersTimeoutMs: 15000,
     requestTimeoutMs: 120000,
     keepAliveTimeoutMs: 5000,

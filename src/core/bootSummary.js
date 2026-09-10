@@ -47,7 +47,7 @@ function tableGroups(db = {}) {
 }
 
 export function buildBootSummary({
-  port, versionLine = '', env = 'development',
+  port, serverUrl = `http://localhost:${port}`, versionLine = '', env = 'development',
   dbStatus = {}, dbTarget = '', migration = {}, admin = {},
   // ★ v1.10.16 — 테이블 부류 안내를 위한 db 설정 스냅샷
   db = {},
@@ -87,7 +87,7 @@ export function buildBootSummary({
   if (problems.length === 0) {
     lines.push('  ─────────────────────────────────────────────────────────────');
     lines.push(`   Startup summary   ${versionLine}`);
-    lines.push(`     Server    http://localhost:${port}`);
+    lines.push(`     Server    ${serverUrl}`);
     /* ★ v1.9.3 — 어떤 로그 파일이 만들어지는지 알려 준다.
        SQL 전용 파일은 기본이 꺼짐인데, 그 사실을 알 방법이 없어
        "분리 저장되는 줄 알았는데 파일이 없다" 는 혼란이 있었다. */
@@ -126,7 +126,7 @@ export function buildBootSummary({
     lines.push('  ╔════════════════════════════════════════════════════════════════════════════╗');
     lines.push('  ║  ⚠ The server is up but not healthy — the items below need fixing        ║');
     lines.push('  ╚════════════════════════════════════════════════════════════════════════════╝');
-    lines.push(`     Server    http://localhost:${port}   (${versionLine})`);
+    lines.push(`     Server    ${serverUrl}   (${versionLine})`);
     problems.forEach((p, i) => {
       lines.push(`     ${i + 1}) ${p.what}`);
       lines.push(`        → ${p.how}`);

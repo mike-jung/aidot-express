@@ -21,6 +21,13 @@ export function validateArchiveEntries(entries, { maxEntryBytes = 16 * 1024 * 10
 
 /** Reject existing symlinks/junctions along a restore destination. */
 export function assertRestorePath(root, target) {
+  root = path.resolve(root);
+  for (let ancestor = root; ; ancestor = path.dirname(ancestor)) {
+    try {
+      if (fs.lstatSync(ancestor).isSymbolicLink()) throw Object.assign(new Error('Restore root contains a symlink'), { status: 400 });
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (ancestor === path.dirname(ancestor)) break;
+  }
   const rel = path.relative(root, target);
   if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw Object.assign(new Error('Restore path outside project'), { status: 400 });
   let current = root;

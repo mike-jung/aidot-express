@@ -132,7 +132,7 @@ function startServerProcess({ onLog, userDataPath } = {}) {
     proc.once('message', (msg) => {
       clearTimeout(timer);
       if (msg && msg.type === 'ready' && typeof msg.port === 'number') {
-        resolve({ proc, port: msg.port });
+        resolve({ proc, port: msg.port, protocol: msg.protocol || 'http', hostname: msg.hostname || '127.0.0.1', certificate: msg.certificate || null, tls: msg.tls || null });
         return;
       }
       // supervisor 가 기동 실패 원인을 알려 준 경우 — 그대로 사용자에게 표시한다

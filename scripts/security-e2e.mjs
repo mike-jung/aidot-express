@@ -8,6 +8,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import certificates from '../src/core/certificates.cjs';
+import transport from '../src/core/transport.cjs';
+import settingsFile from '../src/core/httpsConfig.cjs';
 
 const argv = process.argv.slice(2);
 const option = (name, fallback) => argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback;
@@ -16,13 +19,19 @@ const port = Number(option('--port', '17911'));
 const type = option('--database', 'sqlite');
 if (!['sqlite', 'mariadb'].includes(type)) throw new Error('Use sqlite or a disposable MariaDB instance');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'aidot-security-e2e-'));
+const serviceMode = argv.includes('--service');
+const useHttps = argv.includes('--https');
+if (serviceMode && !useHttps) throw new Error('Service integration requires --https');
+const certificate = useHttps ? await certificates.generateCertificate({ baseDir: temporary }) : null;
+const prepared = transport.prepareTls(certificate?.settings || {});
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const edition = pkg.aidotEdition || 'full';
 let initial = `Initial-${crypto.randomBytes(12).toString('hex')}`;
 const changed = `Changed-${crypto.randomBytes(12).toString('hex')}`;
 const schema = `aidot_test_${crypto.randomBytes(6).toString('hex')}`;
 const values = {
-  NODE_ENV: argv.includes('--bootstrap-file') ? 'production' : 'development', ELECTRON_USER_DATA: temporary, HOST: '127.0.0.1', PORT: port, CONTROL_PORT: port + 1,
+  NODE_ENV: argv.includes('--bootstrap-file') || useHttps ? 'production' : 'development',
+  HTTPS_ENABLED: 'false', ...(serviceMode ? { AIDOT_DATA_DIR: temporary } : { ELECTRON_USER_DATA: temporary }), HOST: '127.0.0.1', PORT: port, CONTROL_PORT: port + 1,
   CONTROL_HOST: '127.0.0.1', CONTROL_ENABLED: 'true', SUPERVISOR_WATCHDOG: 'false',
   DB_TYPE: type, DB_FILE: path.join(temporary, 'test.sqlite'), DB_DATABASE: schema,
   DB_HOST: '127.0.0.1', DB_PORT: process.env.TEST_DB_PORT || 13306,
@@ -41,25 +50,32 @@ const values = {
 if (Object.values(values).some((value) => /[\r\n\0]/.test(String(value)))) throw new Error('Multiline test configuration is not supported');
 const envFile = path.join(temporary, '.env');
 fs.writeFileSync(envFile, Object.entries(values).map(([key, value]) => `${key}=${JSON.stringify(String(value))}`).join('\n'));
+if (useHttps) settingsFile.saveTlsSettings(envFile, certificate.settings);
 const output = fs.openSync(path.join(temporary, 'server.log'), 'w');
-const child = spawn(process.execPath, ['--import', './src/loader/register.mjs', 'src/supervisor.js'], {
+const child = spawn(process.execPath, serviceMode ? ['scripts/server/run.mjs', '--data-dir', temporary] : ['--import', './src/loader/register.mjs', 'src/supervisor.js'], {
   cwd: root, env: { ...process.env, AIDOT_ENV_FILE: envFile }, stdio: ['ignore', output, output, 'ipc'],
 });
 fs.closeSync(output);
-const base = `http://127.0.0.1:${port}`;
-const control = `http://127.0.0.1:${port + 1}`;
+const base = `${prepared.protocol}://127.0.0.1:${port}`;
+const control = `${prepared.protocol}://127.0.0.1:${port + 1}`;
 const results = [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function request(route, { method = 'GET', token, cookie, body, headers = {}, controlApi = false } = {}) {
-  const response = await fetch((controlApi ? control : base) + route, {
-    method, signal: AbortSignal.timeout(15000), headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(cookie ? { Cookie: cookie } : {}),
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers,
-    }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  const payload = body === undefined ? null : Buffer.from(JSON.stringify(body));
+  const response = await new Promise((resolve, reject) => {
+    const req = transport.localRequest(prepared, {
+      port: controlApi ? port + 1 : port, path: route, method, timeout: 15000,
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(cookie ? { Cookie: cookie } : {}),
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': payload.length } : {}), ...headers },
+    }, res => {
+      const chunks = []; res.on('data', chunk => chunks.push(chunk)); res.on('error', reject);
+      res.on('end', () => resolve({ status: res.statusCode, headers: new Headers(Object.entries(res.headers).map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : value])), text: Buffer.concat(chunks).toString() }));
+    });
+    req.on('error', reject); req.on('timeout', () => req.destroy(new Error('Request timed out'))); req.end(payload);
   });
-  const text = await response.text();
-  let data; try { data = JSON.parse(text); } catch { data = null; }
-  return { status: response.status, body: data, cookie: response.headers.get('set-cookie')?.split(';')[0], headers: response.headers, bytes: text.length };
+  let data; try { data = JSON.parse(response.text); } catch { data = null; }
+  return { status: response.status, body: data, cookie: response.headers.get('set-cookie')?.split(';')[0], headers: response.headers, bytes: response.text.length };
+
 }
 async function expectStatus(label, route, expected, options = {}) {
   const response = await request(route, options);
@@ -70,6 +86,7 @@ async function expectStatus(label, route, expected, options = {}) {
 async function login(username = 'admin', password = changed) {
   const response = await expectStatus('login', '/api/admin/auth/login', 200, { method: 'POST', body: { username, password } });
   assert.ok(response.body?.data?.accessToken && response.cookie);
+  if (useHttps) assert.match(response.headers.get('set-cookie'), /; Secure/i, 'HTTPS authentication cookies must be Secure');
   return { token: response.body.data.accessToken, cookie: response.cookie, user: response.body.data.user };
 }
 async function ready() {
@@ -91,6 +108,7 @@ try {
   await expectStatus('compiled console is served', '/', 200);
   const marker = await expectStatus('edition marker is served', '/aidot-edition.json', 200);
   assert.equal(marker.body?.edition, edition);
+  assert.equal(marker.body?.version, pkg.version, 'compiled console version matches the server');
   await expectStatus('anonymous administration denied', '/api/admin/users/paged', 401);
   await expectStatus('cross-origin login rejected', '/api/admin/auth/login', 403, { method: 'POST', headers: { Origin: 'https://attacker.invalid' }, body: { username: 'admin', password: initial } });
   const bootstrap = await login('admin', initial);
@@ -112,6 +130,8 @@ try {
   const id = created.body.data.id;
   assert.ok(id);
   const limited = await login('reviewer');
+  await expectStatus('limited account cannot change HTTPS settings', '/api/admin/config/https', 403, { ...limited, method: 'PUT', body: { enabled: false } });
+  await expectStatus('limited account cannot generate certificates', '/api/admin/config/https/certificate', 403, { ...limited, method: 'POST', body: {} });
   await expectStatus('limited account cannot administer users', '/api/admin/users/paged', 403, limited);
   await expectStatus('limited account cannot execute SQL', '/api/admin/sqls/test', 403, { ...limited, method: 'POST', body: { sqlBody: 'SELECT 1' } });
   await expectStatus('limited account cannot control process', '/api/control/status', 403, { ...limited, controlApi: true });
@@ -154,10 +174,30 @@ try {
   await expectStatus('global logout denies control process', '/api/control/status', 401, { ...admin, controlApi: true });
   if (argv.includes('--bootstrap-file')) assert.equal(fs.existsSync(path.join(temporary, 'initial-admin-credentials.json')), false, 'initial credential removed after password change');
   const current = await login();
+  if (useHttps) {
+    const state = await expectStatus('HTTPS settings are available', '/api/admin/config/https', 200, current);
+    assert.equal(state.body.data.active.protocol, 'https');
+    assert.equal(state.body.data.restartRequired, false);
+    assert.equal(Object.hasOwn(state.body.data.configured, 'passphrase'), false);
+    await expectStatus('Control accepts HTTPS console origin', '/api/control/status', 200, { ...current, controlApi: true, headers: { Origin: base } });
+    const before = fs.readFileSync(envFile);
+    await expectStatus('invalid HTTPS key is rejected before writing', '/api/admin/config/https', 400, { ...current, method: 'PUT', body: { enabled: true, keyFile: 'missing.key' } });
+    assert.deepEqual(fs.readFileSync(envFile), before);
+    const ca = await expectStatus('only public CA material can be downloaded', '/api/admin/config/https/ca', 200, current);
+    assert.match(ca.body.data.pem, /BEGIN CERTIFICATE/); assert.doesNotMatch(ca.body.data.pem, /PRIVATE KEY/);
+    await expectStatus('invalid SAN input is rejected', '/api/admin/config/https/certificate', 400, { ...current, method: 'POST', body: { hosts: 'https://example.test' } });
+    await expectStatus(serviceMode ? 'Service cannot disable HTTPS' : 'HTTPS change is saved for complete restart', '/api/admin/config/https', serviceMode ? 400 : 200, { ...current, method: 'PUT', body: { enabled: false } });
+    const pending = await request('/api/admin/config/https', current);
+    assert.equal(pending.body.data.restartRequired, !serviceMode); assert.equal(pending.body.data.active.enabled, true);
+  }
   await expectStatus('restart main process', '/api/control/restart', 200, { ...current, controlApi: true, method: 'POST' });
   await ready();
   await expectStatus('revocation survives restart', '/api/admin/auth/me', 401, admin);
   await expectStatus('current session survives orderly restart', '/api/admin/auth/me', 200, current);
+  if (useHttps) {
+    const active = await expectStatus('worker restart preserves HTTPS on both listeners', '/api/admin/config/transport', 200, current);
+    assert.equal(active.body.data.protocol, 'https');
+  }
   const crashed = argv.includes('--crash-supervisor');
   const exited = new Promise((resolve) => child.once('exit', resolve));
   if (crashed) child.kill('SIGKILL');
@@ -180,7 +220,7 @@ try {
   // A killed supervisor cannot forward the child's final stdout into this log.
   if (!crashed) assert.match(fs.readFileSync(path.join(temporary, 'server.log'), 'utf8'), /PARENT_REQUEST/);
   results.push({ check: crashed ? 'supervisor crash closes orphaned main server' : 'IPC shutdown closes main and control servers', status: 'passed' });
-  console.log(JSON.stringify({ edition, database: type, version: pkg.version, checks: results.length, results }, null, 2));
+  console.log(JSON.stringify({ edition, protocol: prepared.protocol, database: type, version: pkg.version, checks: results.length, results }, null, 2));
 } catch (error) {
   console.error(`${error.message}\nDiagnostic log: ${temporary}/server.log`);
   process.exitCode = 1;

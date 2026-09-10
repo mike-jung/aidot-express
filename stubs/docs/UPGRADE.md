@@ -27,8 +27,8 @@ for console accounts. MariaDB and SQLite variants are provided. Start one instan
 first and confirm those migrations complete before starting additional instances.
 Do not mix old and new authentication implementations against the same database.
 
-Replace `CORS_ORIGIN=*` or reflective settings with an empty value for same-origin
-use or an explicit list of trusted frontend origins. Review cookie security and
+Use an empty `CORS_ORIGIN` for the same-origin console, or list exact trusted frontend origins.
+Legacy `*` entries now produce a warning and grant no additional access. Reflective settings remain invalid. Review cookie security and
 proxy trust in [Security operations](SECURITY_OPERATIONS.md).
 Initial-password accounts must change their password before using protected APIs.
 Password and account changes invalidate earlier sessions; verify login and refresh.

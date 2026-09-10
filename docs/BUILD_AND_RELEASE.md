@@ -72,3 +72,7 @@ A `mksquashfs ENOENT` error means the Linux environment needs squashfs-tools.
 Test installation, upgrade and removal with an isolated profile before distribution.
 Code signing and publisher trust are separate from a file's checksum. Read
 [Windows operations](WINDOWS_OPERATIONS.md) and [Upgrading](UPGRADE.md).
+
+## Independent server packages (1.45.0)
+
+See [SERVER_INSTALL.md](SERVER_INSTALL.md) for the supported Node.js service packaging path. It avoids Electron runtime dependencies and separates application versions from configuration and data.

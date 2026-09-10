@@ -12,6 +12,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronApp', {
   /** 앱 정보 조회 { name, version, port, serverReady, isDev } */
   getInfo: () => ipcRenderer.invoke('app:info'),
+  restartApplication: () => ipcRenderer.invoke('app:restart'),
 
   /** 외부 URL 을 기본 브라우저로 열기 */
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),

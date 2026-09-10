@@ -33,7 +33,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILE = path.join(projectRoot, 'src', 'config', 'blocked.json');
+const FILE = process.env.AIDOT_DATA_DIR ? path.join(process.env.AIDOT_DATA_DIR, 'blocked.json')
+  : path.join(projectRoot, 'src', 'config', 'blocked.json');
 const KINDS = ['controllers', 'services', 'sqls'];
 
 let cache = null;

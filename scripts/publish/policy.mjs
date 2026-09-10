@@ -25,7 +25,7 @@ export function globRegex(pattern) {
   return new RegExp(`^${text}$`);
 }
 
-const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist-electron', 'dist-release', 'log', 'data', '.cache', '.tmp', '.build', 'dist-public', '.patch-backups']);
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist-electron', 'dist-server', 'dist-release', 'log', 'data', '.cache', '.tmp', '.build', 'dist-public', '.patch-backups']);
 export function walkFiles(root, prefix = '') {
   const out = [];
   for (const item of fs.readdirSync(path.join(root, prefix), { withFileTypes: true })) {
@@ -38,8 +38,8 @@ export function walkFiles(root, prefix = '') {
 }
 
 export function forbiddenLocalPath(rel) {
-  return /(^|\/)(?:\.env(?:\..*)?|\.npmrc|\.git|node_modules|data|log|logs|\.cache|\.tmp)(\/|$)/i.test(rel) && !/\.env(?:\.[a-z]+)?\.example$/.test(rel)
-    || /(?:\.__full(?:\/|$)|\.(?:pem|key|p12|pfx|sqlite|sqlite3|db|zip|exe|appimage)$|(?:^|\/)(?:id_rsa|id_ed25519)$)/i.test(rel);
+  return /(^|\/)(?:\.env(?:\..*)?|\.npmrc|\.git|node_modules|certs|data|log|logs|\.cache|\.tmp)(\/|$)/i.test(rel) && !/\.env(?:\.[a-z]+)?\.example$/.test(rel)
+    || /(?:\.__full(?:\/|$)|\.(?:pem|crt|cer|key|p12|pfx|sqlite|sqlite3|db|zip|exe|appimage)$|(?:^|\/)(?:id_rsa|id_ed25519)$)/i.test(rel);
 }
 
 export function readPolicy(root) {
@@ -106,13 +106,13 @@ export function publicEntries(root, policy = readPolicy(root)) {
   return entries;
 }
 
-export function verifyPublicAssets(root, version) {
-  const dir = path.join(root, 'admin-client', 'dist-public');
+export function verifyPublicAssets(root, version, folder = 'dist-public') {
+  const dir = path.join(root, 'admin-client', folder);
   const marker = JSON.parse(fs.readFileSync(path.join(dir, 'aidot-edition.json'), 'utf8'));
   if (marker.edition !== 'public' || marker.version !== version) throw new Error('Rebuild the public console for this version');
   const entries = walkFiles(dir);
   if (entries.some((f) => /(?:HaPage|BackupPage|SecureColumnsPage|MciController|MciTemplate|MciAbbreviations)/i.test(f))) throw new Error('Enterprise view found in public assets');
-  return entries.map((f) => ({ source: `admin-client/dist-public/${f}`, destination: `admin-client/dist/${f}` }));
+  return entries.map((f) => ({ source: `admin-client/${folder}/${f}`, destination: `admin-client/dist/${f}` }));
 }
 
 export function scanEntries(root, entries, policy = readPolicy(root)) {

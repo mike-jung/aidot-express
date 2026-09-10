@@ -17,9 +17,9 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import http from 'node:http';
+import transport from './core/transport.cjs';
 import logger from './util/logger.js';
-import config from './config/index.js';
+import config, { activeTransport } from './config/index.js';
 import { createControlApp } from './controlServer.js';
 import { configureHttpServer } from './core/httpLimits.js';
 import { Watchdog } from './watchdog.js';
@@ -30,6 +30,7 @@ const projectRoot = path.resolve(__dirname, '..');
 
 class Supervisor {
   constructor() {
+    this.transport = activeTransport;
     this.child = null;
     this.startedAt = null;    // 메인이 start() 된 시각 (ms)
     this.stoppingPromise = null;  // stop() 진행 중이면 resolve 되는 Promise
@@ -53,6 +54,7 @@ class Supervisor {
       uptimeSec: (running && this.startedAt) ? Math.floor((now - this.startedAt) / 1000) : null,
       mainPort: this.mainPort,
       controlPort: config.control?.port ?? null,
+      protocol: activeTransport.protocol,
       lastExit: this.lastExit,
       stopping: !!this.stoppingPromise,
       // ★ v1.11.0 — 대시보드가 그대로 보여 준다
@@ -93,7 +95,9 @@ class Supervisor {
     if (config.control?.watchdog?.hangDump !== false) {
       args.unshift(`--inspect-port=127.0.0.1:${this.inspectPort}`);
     }
-    const env = { ...process.env, PORT: String(this.mainPort), AIDOT_SUPERVISED: '1' };
+    const env = { ...process.env, PORT: String(this.mainPort), AIDOT_SUPERVISED: '1',
+      AIDOT_ACTIVE_TLS: JSON.stringify(activeTransport.settings),
+      AIDOT_TLS_FINGERPRINT: activeTransport.certificate?.fingerprint256 || '' };
     this.expectedExit = false;
 
     logger.info(`[supervisor] starting the main server (port=${this.mainPort})`);
@@ -244,7 +248,7 @@ function waitForHealth(port, timeoutMs, isAlive = () => true) {
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs;
     const attempt = () => {
-      const req = http.request({
+      const req = transport.localRequest(activeTransport, {
         host: '127.0.0.1',
         port,
         path: '/health',
@@ -282,8 +286,9 @@ async function bootstrap() {
   const controlPort = Number(config.control?.port ?? 7902);
   const controlHost = config.control?.host ?? '127.0.0.1';
 
-  const server = app.listen(controlPort, controlHost, () => {
-    logger.info(`[supervisor] Control API http://${controlHost}:${controlPort}`);
+  const server = transport.createListener(app, activeTransport);
+  server.listen(controlPort, controlHost, () => {
+    logger.info(`[supervisor] Control API ${transport.urlFor(activeTransport.protocol, activeTransport.hostname, controlPort)}`);
   });
   configureHttpServer(server, config.server);
 
@@ -306,7 +311,9 @@ async function bootstrap() {
       // Electron 에서 fork 된 경우 부모에게 ready 시그널을 전달.
       //   main 포트가 실제 HTTP 응답하므로 이것을 "서버 준비 완료" 로 간주.
       if (process.send) {
-        try { process.send({ type: 'ready', port: st.mainPort, controlPort }); } catch (_) {}
+        try { process.send({ type: 'ready', port: st.mainPort, controlPort, protocol: activeTransport.protocol,
+          hostname: activeTransport.hostname, certificate: activeTransport.certificate,
+          tls: { enabled: activeTransport.enabled, certFile: activeTransport.settings.certFile, caFile: activeTransport.settings.caFile, serverName: activeTransport.hostname } }); } catch (_) {}
       }
     } else {
       const why = st.running

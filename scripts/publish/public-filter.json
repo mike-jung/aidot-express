@@ -101,15 +101,22 @@
       "docs/UPGRADE.md",
       "docs/WINDOWS_OPERATIONS.md",
       "docs/aidot-express-tutorial-v1.32.0.pdf",
-      "docs/aidot-express-tutorial-v1.32.0_ko.pdf"
+      "docs/aidot-express-tutorial-v1.32.0_ko.pdf",
+      "docs/HTTPS.md",
+      "docs/SERVER_INSTALL.md"
     ],
     "tests/**": [
       "tests/security-hardening.test.mjs",
+      "tests/startup-dependencies.test.mjs",
+      "tests/cors-compat.test.mjs",
+      "tests/external-server.test.mjs",
       "tests/sqlite-dialect.test.mjs",
       "tests/handler-signature.test.mjs",
       "tests/route-collision.test.mjs",
       "tests/table-prefix.test.mjs",
-      "tests/migration-recover.test.mjs"
+      "tests/migration-recover.test.mjs",
+      "tests/https.test.mjs",
+      "tests/server-package.test.mjs"
     ],
     "*": [
       ".env.example",
@@ -124,6 +131,7 @@
     ],
     "scripts/**": [
       "scripts/start.mjs",
+      "scripts/startup-dependencies.mjs",
       "scripts/build-edition.mjs",
       "scripts/build-linux.mjs",
       "scripts/linux-artifacts.mjs",
@@ -149,7 +157,9 @@
       "scripts/publish/pii-scan.mjs",
       "scripts/windows/aidot-express.xml",
       "scripts/windows/install-service.ps1",
-      "scripts/windows/uninstall-service.ps1"
+      "scripts/windows/uninstall-service.ps1",
+      "scripts/https-cert.mjs",
+      "scripts/server/**"
     ],
     "workspace/**": [
       "workspace/README.md"
@@ -202,7 +212,8 @@
       "docs/BUILD_AND_RELEASE.md",
       "docs/UPGRADE.md",
       "docs/WINDOWS_OPERATIONS.md",
-      "docs/SECURITY_OPERATIONS.md"
+      "docs/SECURITY_OPERATIONS.md",
+      "docs/SERVER_INSTALL.md"
     ]
   },
   "sourceRoots": [
@@ -247,6 +258,13 @@
     "ensure:deps",
     "check:security",
     "test:security:e2e",
-    "electron:install"
+    "electron:install",
+    "https:cert",
+    "https:check",
+    "dist:server:win",
+    "dist:server:linux",
+    "server:configure",
+    "server:run",
+    "server:health"
   ]
 }

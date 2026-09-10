@@ -69,7 +69,7 @@ test('origin rejection happens before handlers, including CSRF form requests', a
   assert.equal(calls, 3);
 });
 
-test('wildcards, origin paths and credentialed origins are rejected', () => {
+test('reflective origins, paths and embedded credentials are rejected', () => {
   assert.throws(() => originPolicy({ cors: { origin: true } }));
   for (const input of ['null', 'file:///tmp/a', 'https://user:pass@trusted.example', 'https://trusted.example/path']) assert.equal(canonicalOrigin(input), null);
   assert.equal(canonicalOrigin('https://trusted.example:443'), 'https://trusted.example');

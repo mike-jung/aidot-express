@@ -14,7 +14,7 @@
  */
 
 export function genApiClient(project) {
-  const baseUrl = (project?.config?.apiBaseUrl) || 'http://localhost:7901';
+  const baseUrl = (project?.config?.apiBaseUrl) || globalThis.location?.origin || 'http://localhost:7901';
   return {
     path: 'src/api/client.js',
     content: `import axios from 'axios';

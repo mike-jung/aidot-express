@@ -8,6 +8,36 @@
  *  Keep keys grouped by screen. Flat keys become unmanageable past ~100 entries.
  */
 export default {
+  httpsSettings: {
+    "title": "HTTPS / Certificates",
+    "description": "Configure HTTPS for both the application and Control server. Settings take effect after restarting the complete app or service.",
+    "restartRequired": "Saved settings differ from the running server. Restart the complete application/service; the Dashboard worker restart does not apply HTTPS changes. Then open the address below.",
+    "restartApp": "Restart application",
+    "enable": "Enable HTTPS",
+    "keyFile": "Private key file (PEM)",
+    "certFile": "Server certificate / full chain file (PEM)",
+    "caFile": "Private CA file for internal clients (optional)",
+    "serverName": "Certificate hostname for internal checks (optional)",
+    "paths": "Relative paths use the directory containing:",
+    "replacePassphrase": "Replace or clear the private key passphrase",
+    "passphraseSet": "a passphrase is already set",
+    "passphrase": "Private key passphrase; leave empty to clear",
+    "showPassphrase": "Show or hide passphrase",
+    "save": "Validate and save",
+    "reload": "Reload",
+    "downloadCa": "Download CA certificate",
+    "generateTitle": "Generate a private certificate",
+    "generateHelp": "No OpenSSL installation is needed. Creates a new certificate directory and a new private CA; existing certificates are preserved. Enter every DNS name/IP used to connect. Keep localhost for Electron.",
+    "hosts": "Certificate hostnames / IP addresses (comma separated)",
+    "days": "Validity in days (1–365)",
+    "generate": "Generate certificate",
+    "trust": "After saving, import only ca.crt into the trusted root store on each client. Never share server.key. A new generation creates a new CA that must be trusted again. See docs/HTTPS.md.",
+    "generated": "Certificate generated. Review the paths, then select Validate and save.",
+    "saved": "HTTPS settings saved. The running server keeps its current configuration until the entire app/service restarts.",
+    "activeCertificate": "Active certificate SAN",
+    "validTo": "Expires at (UTC)",
+    "production": "Remote production access requires HTTPS. For public Internet use, configure a publicly trusted certificate and its full chain."
+},
   edition: {
     backHome: 'Back to home',
     notIncluded: 'Not included in this edition',

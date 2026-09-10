@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireHttps } from './core/requireHttps.js';
 import { originPolicy } from './core/originPolicy.js';
 import { redactUrl } from './core/logRedaction.js';
 import helmet from 'helmet';
@@ -89,6 +90,7 @@ export async function createServer() {
 
   // 리버스 프록시 뒤에 있을 때만 실제 client IP 를 신뢰 (.env TRUST_PROXY). 기본 false — 위조 X-Forwarded-For 차단.
   app.set('trust proxy', config.server.trustProxy ?? false);
+  app.use(requireHttps(config));
 
   // helmet: CSP, HSTS, X-Frame-Options, X-Content-Type-Options 등
   // - API 서버이면 CSP 는 제한적으로 사용. 정적 페이지도 서빙하므로 기본값 사용.

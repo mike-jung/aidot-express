@@ -16,7 +16,9 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
+import { isIP } from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { normalizeCorsOrigins } from '../core/corsConfig.js';
 
 /** 로드된 .env 파일의 절대경로 목록 — 진단 + ConfigService 가 "편집 대상" 경로로 사용. */
 export const loadedEnvFiles = [];
@@ -74,13 +76,17 @@ function readEnvFileDecoded(filePath) {
   // resources/.env 는 의도적으로 제외: 사용자가 편집한 것과 혼동되는 두 번째 소스는 혼란만 키움.
   // 인스톨러도 v7 부터 resources/.env 를 쓰지 않으며, 기존 파일이 있으면 제거한다.
   const candidates = [];
+  const serviceMode = process.env.AIDOT_SERVICE_MODE === '1';
+  if (serviceMode && (!process.env.AIDOT_ENV_FILE || !path.isAbsolute(process.env.AIDOT_ENV_FILE) || !fs.statSync(process.env.AIDOT_ENV_FILE).isFile())) throw new Error('Service mode requires an existing absolute AIDOT_ENV_FILE');
   if (process.env.AIDOT_ENV_FILE) candidates.push(process.env.AIDOT_ENV_FILE);
 
-  const userDataPath = process.env.ELECTRON_USER_DATA_PATH || '';
+  const userDataPath = serviceMode ? '' : process.env.ELECTRON_USER_DATA_PATH || '';
   if (userDataPath) candidates.push(path.join(userDataPath, '.env'));
 
-  candidates.push(path.join(process.cwd(), '.env'));
-  candidates.push(path.join(projectRoot, '.env'));
+  if (!serviceMode) {
+    candidates.push(path.join(process.cwd(), '.env'));
+    candidates.push(path.join(projectRoot, '.env'));
+  }
 
   // 중복 제거 (동일 절대 경로는 한 번만)
   const seen = new Set();
@@ -102,10 +108,12 @@ function readEnvFileDecoded(filePath) {
       const parsed = dotenv.parse(text);                   // key-value 객체
       // override:true 동일 동작 — 기존 값 덮어쓰기
       for (const [k, v] of Object.entries(parsed)) {
+        if (serviceMode && ['AIDOT_SERVICE_MODE', 'AIDOT_ENV_FILE', 'AIDOT_DATA_DIR'].includes(k)) continue;
         process.env[k] = v;
       }
       if (!loadedEnvFiles.includes(p)) loadedEnvFiles.push(p);
     } catch (e) {
+      if (serviceMode) throw e;
       console.error(`[config] could not load .env: ${p}`);
       console.error(`[config]   ${e.message}`);
     }
@@ -152,6 +160,7 @@ function readEnvFileDecoded(filePath) {
 
 import defaultConfig from './default.js';
 import { validateServerLimits } from '../core/httpLimits.js';
+import transport from '../core/transport.cjs';
 
 /** TRUST_PROXY 문자열 → express 'trust proxy' 설정값 */
 function parseTrustProxy(v) {
@@ -495,11 +504,28 @@ function prune(obj) {
 
 const config = deepMerge(deepMerge(defaultConfig, envConfig), prune(dotenvOverrides));
 config.env = env;
+config.server.tls = transport.tlsFromEnv(process.env, config.server.tls);
+// A worker restart must not switch only one of the two listener protocols.
+// HTTPS changes are applied by restarting the complete supervisor/app.
+if (process.env.AIDOT_SUPERVISED === '1' && process.send && process.env.AIDOT_ACTIVE_TLS) {
+  config.server.tls = JSON.parse(process.env.AIDOT_ACTIVE_TLS);
+}
+export const tlsBaseDir = path.dirname(loadedEnvFiles[0] || process.env.AIDOT_ENV_FILE
+  || path.join(process.env.ELECTRON_USER_DATA_PATH || fileURLToPath(new URL('../..', import.meta.url)), '.env'));
+export const activeTransport = transport.prepareTls(config.server.tls, tlsBaseDir);
+if (process.env.AIDOT_SUPERVISED === '1' && process.env.AIDOT_TLS_FINGERPRINT
+  && activeTransport.certificate?.fingerprint256 !== process.env.AIDOT_TLS_FINGERPRINT) {
+  throw new Error('HTTPS certificate changed. Restart the complete app/service to reload both listeners.');
+}
+if (activeTransport.enabled) config.auth.cookieSecure = true;
 // Desktop loopback listeners must not accept a DNS-rebinding host name.
 config.server.allowedHosts = process.env.ALLOWED_HOSTS
   ? process.env.ALLOWED_HOSTS.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean)
   : process.env.ELECTRON_USER_DATA ? ['localhost', '127.0.0.1', '[::1]'] : [];
-if (config.server.allowedHosts.some((host) => !/^(?:[a-z0-9.-]+|\[::1\])$/.test(host))) throw new Error('ALLOWED_HOSTS must contain exact hostnames without schemes or ports');
+if (!process.env.ALLOWED_HOSTS && process.env.ELECTRON_USER_DATA && activeTransport.enabled) {
+  config.server.allowedHosts.push(activeTransport.hostname.includes(':') ? `[${activeTransport.hostname}]` : activeTransport.hostname);
+}
+if (config.server.allowedHosts.some((host) => !/^[a-z0-9.-]+$/.test(host) && !(host.startsWith('[') && host.endsWith(']') && isIP(host.slice(1, -1)) === 6))) throw new Error('ALLOWED_HOSTS must contain exact hostnames without schemes or ports');
 const editionPackage = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 config.edition = editionPackage.aidotEdition || 'full';
 if (config.edition === 'public') {
@@ -512,8 +538,10 @@ if (config.edition === 'public') {
   if (config.mciGenerator) config.mciGenerator.enabled = false;
 }
 validateServerLimits(config.server);
-if (config.cors.origin === true || config.cors.origin === '*' || config.cors.origin?.includes?.('*')) {
-  throw new Error('CORS_ORIGIN requires exact origins; remove * or list trusted URLs');
+const corsOrigins = normalizeCorsOrigins(config.cors.origin);
+config.cors.origin = corsOrigins.origins;
+if (corsOrigins.ignoredWildcard) {
+  console.warn('[config] Legacy CORS_ORIGIN=* ignored. Same-origin requests and explicitly listed trusted origins are allowed. Set CORS_ORIGIN= for this console, or list exact frontend URLs.');
 }
 if (config.auth.cookieSameSite === 'none' && !config.auth.cookieSecure) {
   throw new Error('SameSite=None requires AUTH_COOKIE_SECURE=true');
@@ -544,3 +572,5 @@ try {
 } catch {}
 
 export default config;
+
+if (process.env.AIDOT_SERVICE_MODE === '1' && !activeTransport.enabled) throw new Error('Service mode requires HTTPS; configure valid certificates before starting');

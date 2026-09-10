@@ -1,4 +1,5 @@
 <script setup>
+import { sameOriginApiUrl } from '../utils/apiUrl.js';
 /* ⚠ 이 안의 <button> 에는 반드시 type="button" 을 준다.
    type 이 없으면 브라우저가 submit 으로 보고, 이 컴포넌트가 폼 안에 놓이는 순간
    [전송] 을 누를 때마다 **페이지 전체가 새로고침**된다(화면이 깜박이는 증상). */
@@ -187,6 +188,8 @@ const builtUrl = computed(() => {
   return url;
 });
 
+const absoluteUrl = computed(() => { try { return sameOriginApiUrl(builtUrl.value); } catch { return builtUrl.value; } });
+
 async function send() {
   /* ★ v1.15.4 — 보내기 전에 **이전 응답을 지우지 않는다.**
      지우면 응답 영역(v-if)이 통째로 사라져 대화상자 높이가 확 줄었다가 다시 늘어난다 —
@@ -224,11 +227,12 @@ async function send() {
 
   const t0 = performance.now();
   try {
-    const res = await fetch(builtUrl.value, {
+    const res = await fetch(sameOriginApiUrl(builtUrl.value), {
       method: props.route.method,
       headers: h,
       body,
       credentials: 'include',
+      redirect: 'error',
     });
     responseTimeMs.value = Math.round(performance.now() - t0);
     responseStatus.value = res.status;
@@ -286,7 +290,7 @@ const statusBadgeClass = computed(() => {
     <div class="mb-3 p-2 rounded small font-monospace"
          style="background:#1e2129; color:#aab; word-break:break-all">
       <span class="badge bg-primary me-2">{{ route.method }}</span>
-      {{ builtUrl || t('apiCallForm.k22') }}
+      {{ absoluteUrl || t('apiCallForm.k22') }}
     </div>
 
     <div class="row g-3">

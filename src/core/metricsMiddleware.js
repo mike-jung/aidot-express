@@ -89,7 +89,7 @@ function extractUserAgent(req) {
 }
 
 /** URL 쿼리에 실린 토큰/키를 로그 저장 전에 가린다 (SSE 의 ?access_token= 등) */
-const SECRET_QS_RE = /([?&](?:access_token|token|ticket|api_?key|secret|password)=)[^&#]*/gi;
+const SECRET_QS_RE = /([?&](?:access_token|token|ticket|api_?key|secret|password|passphrase|HTTPS_KEY_PASSPHRASE)=)[^&#]*/gi;
 function redactSecrets(url) {
   return String(url || '').replace(SECRET_QS_RE, '$1***');
 }

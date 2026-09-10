@@ -10,7 +10,7 @@ and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
-![Version](https://img.shields.io/badge/version-1.43.4-orange)
+![Version](https://img.shields.io/badge/version-1.45.0-orange)
 
 </div>
 
@@ -189,3 +189,11 @@ not the name — see [`docs/LICENSING.md`](docs/LICENSING.md) for the reasoning 
 choice and what it means in practice.
 
 © 2026 Aidot Link Co., Ltd. · mike.jung.global@gmail.com
+
+## HTTPS
+
+Configure HTTPS from **Settings > HTTPS / Certificates** or generate a private certificate with `npm run https:cert -- --hosts localhost,127.0.0.1,::1 --apply`. Restart the complete app/service and trust the CA in browser clients. See [HTTPS setup and operations](docs/HTTPS.md).
+
+## Independent server distribution
+
+Build an Electron-free Node.js service with npm run dist:server:win or npm run dist:server:linux. See [server installation](docs/SERVER_INSTALL.md) for HTTPS, WinSW, standalone NSIS, systemd and upgrade procedures. Desktop commands remain available.

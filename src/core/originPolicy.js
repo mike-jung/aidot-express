@@ -1,23 +1,13 @@
 import cors from 'cors';
+import { canonicalOrigin, normalizeCorsOrigins } from './corsConfig.js';
+export { canonicalOrigin } from './corsConfig.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-export function canonicalOrigin(value) {
-  try {
-    const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
-      || url.pathname !== '/' || url.search || url.hash) return null;
-    return url.origin;
-  } catch { return null; }
-}
-
 /** Apply one explicit origin policy to CORS and browser state changes. */
 export function originPolicy(config, { additionalOrigins = [] } = {}) {
-  const configured = config.cors?.origin;
-  if (configured === true || configured === '*') {
-    throw new Error('CORS_ORIGIN must list exact origins; credentialed wildcard origins are not allowed');
-  }
-  const entries = [...(Array.isArray(configured) ? configured : configured ? [configured] : []), ...additionalOrigins];
+  const configured = normalizeCorsOrigins(config.cors?.origin).origins;
+  const entries = [...configured, ...additionalOrigins];
   const allowed = new Set(entries.map((entry) => {
     const value = canonicalOrigin(entry);
     if (!value) throw new Error('CORS_ORIGIN contains an invalid origin');

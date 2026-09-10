@@ -6,6 +6,36 @@
  *  (`npm run check:i18n` 이 어긋난 키를 잡아 줍니다)
  */
 export default {
+  httpsSettings: {
+    "title": "HTTPS / 인증서",
+    "description": "메인 서버와 Control 서버의 HTTPS를 함께 설정합니다. 앱 또는 서비스 전체를 재시작한 뒤 적용됩니다.",
+    "restartRequired": "저장한 설정이 실행 중인 서버와 다릅니다. 앱/서비스 전체를 재시작한 뒤 아래 주소로 접속하세요. Dashboard의 서버 재시작은 HTTPS 설정을 적용하지 않습니다.",
+    "restartApp": "앱 전체 재시작",
+    "enable": "HTTPS 사용",
+    "keyFile": "개인키 파일 (PEM)",
+    "certFile": "서버 인증서 / 전체 인증서 체인 파일 (PEM)",
+    "caFile": "내부 클라이언트용 사설 CA 파일 (선택)",
+    "serverName": "내부 상태 확인용 인증서 호스트명 (선택)",
+    "paths": "상대 경로의 기준이 되는 설정 파일:",
+    "replacePassphrase": "개인키 암호 변경 또는 제거",
+    "passphraseSet": "암호가 설정되어 있음",
+    "passphrase": "개인키 암호; 비워두면 제거",
+    "showPassphrase": "암호 표시 또는 숨기기",
+    "save": "검증 후 저장",
+    "reload": "다시 불러오기",
+    "downloadCa": "CA 인증서 다운로드",
+    "generateTitle": "사설 인증서 생성",
+    "generateHelp": "OpenSSL 설치 없이 새 인증서 폴더와 사설 CA를 만듭니다. 기존 인증서는 유지합니다. 접속에 사용할 도메인·IP를 모두 입력하세요. Electron에서는 localhost를 포함하세요.",
+    "hosts": "인증서에 포함할 호스트명 / IP (쉼표로 구분)",
+    "days": "유효기간 (1~365일)",
+    "generate": "인증서 생성",
+    "trust": "저장 후 각 접속 PC의 신뢰할 수 있는 루트 인증 기관에 ca.crt만 등록하세요. server.key는 공유하지 마세요. 새로 생성하면 CA도 바뀌므로 신뢰 등록이 다시 필요합니다. docs/HTTPS.md를 참고하세요.",
+    "generated": "인증서를 생성했습니다. 경로를 확인한 뒤 검증 후 저장을 누르세요.",
+    "saved": "HTTPS 설정을 저장했습니다. 앱/서비스 전체를 재시작할 때까지 현재 설정으로 계속 실행합니다.",
+    "activeCertificate": "사용 중인 인증서 SAN",
+    "validTo": "만료 일시 (UTC)",
+    "production": "운영 모드의 외부 접속에는 HTTPS가 필요합니다. 인터넷 공개 서비스에는 공인 인증서와 전체 인증서 체인을 설정하세요."
+},
   edition: {
     backHome: '홈으로',
     notIncluded: '이 판에는 들어 있지 않은 기능입니다',

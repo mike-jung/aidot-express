@@ -66,7 +66,7 @@ function splitList(raw) {
 
 /** 설치본에서 쓸 수 있는 폴더 — Electron 이 알려 준다 (없으면 null) */
 function userDataWorkspace() {
-  const base = process.env.ELECTRON_USER_DATA;
+  const base = (process.env.AIDOT_DATA_DIR || process.env.ELECTRON_USER_DATA);
   if (!base) return null;
   return path.join(base, 'workspace');
 }
@@ -254,7 +254,8 @@ export function displayPath(abs) {
  *  @returns {{id:'installed'|'release'|'dev', label:string, hint:string}}
  */
 export function runMode() {
-  if (process.env.ELECTRON_USER_DATA) {
+  if (process.env.AIDOT_SERVICE_MODE === '1') return { id: 'installed', label: 'Service', hint: 'Node.js service with a browser console and a separate data directory' };
+  if ((process.env.AIDOT_DATA_DIR || process.env.ELECTRON_USER_DATA)) {
     return {
       id: 'installed',
       label: 'Installed',

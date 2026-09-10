@@ -1,7 +1,7 @@
 {
   "name": "aidot-express",
-  "version": "1.43.4",
-  "description": "Spring Boot 스타일 Node.js + Express 웹서버",
+  "version": "1.45.0",
+  "description": "A Spring Boot style Node.js and Express web server framework",
   "type": "module",
   "engines": {
     "node": ">=22.19"
@@ -38,7 +38,14 @@
     "ensure:deps": "node scripts/ensure-build-deps.mjs",
     "check:security": "node --import ./src/loader/register.mjs --test tests/security-hardening.test.mjs",
     "test:security:e2e": "node scripts/security-e2e.mjs",
-    "electron:install": "node node_modules/electron/install.js"
+    "electron:install": "node node_modules/electron/install.js",
+    "https:cert": "node scripts/https-cert.mjs",
+    "https:check": "node scripts/https-cert.mjs --check",
+    "dist:server:win": "node scripts/server/package.mjs --platform win32",
+    "dist:server:linux": "node scripts/server/package.mjs --platform linux",
+    "server:configure": "node scripts/server/config.mjs",
+    "server:run": "node scripts/server/run.mjs",
+    "server:health": "node scripts/server/health.mjs"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
@@ -59,7 +66,9 @@
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@peculiar/x509": "2.1.0",
+    "reflect-metadata": "0.2.2"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

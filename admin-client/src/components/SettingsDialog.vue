@@ -17,6 +17,7 @@ import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
 import { useI18n } from '../composables/useI18n';
 import { useFormat } from '../composables/useFormat';
 import http from '../api/http';
+import HttpsSettings from './HttpsSettings.vue';
 import { useAuthStore } from '../stores/auth';
 import { useUiFlagsStore } from '../stores/uiFlags';   // ★ v1.14.6 — 빠져 있던 import (EAI 스위치가 쓰는 스토어)
 import { PREF_KEYS, readPref, writePref } from '../utils/prefs';
@@ -42,13 +43,15 @@ const SECTIONS = [
   { key: 'account',   icon: 'bi-person-circle',    titleKey: 'set2.myAccount',   words: '계정 내 정보 비밀번호 password account 이메일 역할' },
   { key: 'display',   icon: 'bi-palette',          titleKey: 'set2.appearance',  words: '화면 테마 다크 라이트 밀도 언어 사이드바 theme dark density language' },
   { key: 'workspace', icon: 'bi-folder2-open',     titleKey: 'set2.workspace',   words: '작업 폴더 저장 위치 컨트롤러 서비스 SQL 시나리오 workspace folder 스키마 테이블 DB schema table' },
+  { key: 'https', icon: 'bi-shield-lock', titleKey: 'httpsSettings.title', words: 'HTTPS TLS SSL certificate security', admin: true },
   { key: 'server',    icon: 'bi-hdd-network',      titleKey: 'set2.serverInfo',  words: '서버 버전 빌드 정보 version build' },
 ];
 const query = ref('');
 const visibleSections = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q) return SECTIONS;
-  return SECTIONS.filter((sc) => `${t(sc.titleKey)} ${sc.words}`.toLowerCase().includes(q));
+  const sections = SECTIONS.filter(sc => !sc.admin || auth.user?.role === 'admin');
+  if (!q) return sections;
+  return sections.filter((sc) => `${t(sc.titleKey)} ${sc.words}`.toLowerCase().includes(q));
 });
 watch(visibleSections, (list) => { if (list.length && !list.some((sc) => sc.key === tab.value)) tab.value = list[0].key; });
 
@@ -645,6 +648,8 @@ function close() { emit('close'); }
               </template>
             </div>
 
+            <HttpsSettings v-else-if="tab === 'https' && isAdmin" />
+
             <!-- ── 서버 정보 ── -->
             <div v-else>
               <h6 class="s-h">{{ t('set2.serverInfo') }}</h6>
@@ -666,7 +671,8 @@ function close() { emit('close'); }
         </div>
 
         <footer class="s-foot">
-          <span class="small text-secondary"><i class="bi bi-lightning-charge me-1"></i>{{ t('set2.instantSave') }}</span>
+          <span v-if="tab === 'https'" class="small text-secondary"><i class="bi bi-shield-lock me-1"></i>{{ t('httpsSettings.save') }} · {{ t('httpsSettings.restartApp') }}</span>
+          <span v-else class="small text-secondary"><i class="bi bi-lightning-charge me-1"></i>{{ t('set2.instantSave') }}</span>
           <button class="btn btn-sm btn-secondary" @click="close">{{ t('common.close') }}</button>
         </footer>
       </div>

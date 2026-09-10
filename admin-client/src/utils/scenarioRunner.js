@@ -1,3 +1,4 @@
+import { sameOriginApiUrl } from './apiUrl.js';
 /**
  * 시나리오 실행 엔진.
  *
@@ -57,11 +58,12 @@ export async function runStep(step, vars, defaultHeaders) {
   const t0 = performance.now();
   let res, text;
   try {
-    res = await fetch(finalUrl, {
+    res = await fetch(sameOriginApiUrl(finalUrl), {
       method: step.method,
       headers: h,
       body,
       credentials: 'include',
+      redirect: 'error',
     });
     text = await res.text();
   } catch (e) {

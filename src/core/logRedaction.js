@@ -1,4 +1,4 @@
-const SENSITIVE = /^(?:access[_-]?token|refresh[_-]?token|token|ticket|password|passwd|secret|api[_-]?key|authorization|code)$/i;
+const SENSITIVE = /^(?:access[_-]?token|refresh[_-]?token|token|ticket|password|passwd|passphrase|https_key_passphrase|secret|api[_-]?key|authorization|code)$/i;
 
 /** Redact encoded query names too; never log an unparseable URL verbatim. */
 export function redactUrl(value) {

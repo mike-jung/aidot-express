@@ -1,5 +1,6 @@
 import { createServer, bootStatus, readiness } from './server.js';
-import config from './config/index.js';
+import config, { activeTransport } from './config/index.js';
+import transport from './core/transport.cjs';
 import { configureHttpServer } from './core/httpLimits.js';
 import logger from './util/logger.js';
 import db from './database/db.js';
@@ -52,13 +53,14 @@ async function main() {
   const app = await createServer();
   const port = config.server.port;
 
-  const server = app.listen(port, config.server.host, () => {
-    logger.info(`server started http://localhost:${port}  ${versionLine()}  (env=${config.env}, db=${db.currentAdapter()})`);
+  const server = transport.createListener(app, activeTransport);
+  server.listen(port, config.server.host, () => {
+    logger.info(`server started ${transport.urlFor(activeTransport.protocol, activeTransport.hostname, port)}  ${versionLine()}  (env=${config.env}, db=${db.currentAdapter()})`);
     printBootSummary(port);
     // Electron 으로 실행된 경우, 부모 프로세스에 ready 시그널 전송.
     //   server-bridge.cjs 가 이 메시지를 대기하고 스플래시를 닫는다.
     if (process.send) {
-      try { process.send({ type: 'ready', port }); } catch (_) { /* non-IPC 환경 */ }
+      try { process.send({ type: 'ready', port, protocol: activeTransport.protocol }); } catch (_) { /* non-IPC environment */ }
     }
   });
 
@@ -160,6 +162,7 @@ function printBootSummary(port) {
   const st = db.getDbStatus();
   const { lines } = buildBootSummary({
     port,
+    serverUrl: transport.urlFor(activeTransport.protocol, activeTransport.hostname, port),
     versionLine: versionLine(),
     env: config.env,
     dbStatus: st,

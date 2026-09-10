@@ -23,3 +23,15 @@ admin-client/dist-public
 
 # Local rollback copies may contain Enterprise source.
 .patch-backups/
+
+# Local HTTPS certificates and environment backups
+certs/
+**/certs/
+*.crt
+*.cer
+*.key
+*.pem
+.env.https-backup-*
+
+# Independent Node.js server packages
+dist-server/

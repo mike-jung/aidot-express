@@ -3,12 +3,12 @@
  * scripts/start.mjs — `npm start` 한 번으로 전부 준비해서 서버를 띄우는 오케스트레이터.
  *
  *  순서
- *   0) Node 버전 확인 (>= 20.19)
+ *   0) Node 버전 확인 (>= 22.19)
  *   1) .env 가 없으면 .env.example 을 복사해 생성 (AUTH_ACCESS_SECRET 은 랜덤 값 자동 주입)
- *   2) 루트 의존성: package.json/package-lock.json 해시가 바뀌었거나 node_modules 가 없으면 `npm install`
+ *   2) 루트 의존성: lockfile과 설치된 필수 패키지를 비교하고 불일치할 때만 `npm install`
  *   3) 관리자 콘솔(admin-client):
  *        - admin-client/src, index.html, vite.config.js, public 의 내용 해시가 바뀌었거나 dist 가 없으면 `vite build`
- *        - 빌드가 필요한데 admin-client/node_modules 가 없거나 package.json 이 바뀌었으면 먼저 `npm install`
+ *        - 빌드가 필요한데 설치된 빌드 의존성이 lockfile과 다르면 먼저 `npm install`
  *   4) DB 마이그레이션: 서버가 기동하면서 자동 적용 (src/database/migrationRunner.js) — 별도 명령 불필요
  *   5) 서버 기동: supervisor(컨트롤 API) → 메인 서버
  *
@@ -28,6 +28,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { installedDependenciesMatch, hasInstalledDevDependencies, npmCommand } from './startup-dependencies.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -39,14 +40,15 @@ const FORCE_BUILD = args.has('--force-build');
 const PREPARE_ONLY = args.has('--prepare-only');
 const MAIN_ONLY = args.has('--main');
 const cacheDir = path.join(root, '.cache');
-const isWin = process.platform === 'win32';
 
 const log = (m) => process.stdout.write(`[start] ${m}\n`);
 const warn = (m) => process.stderr.write(`[start] ⚠ ${m}\n`);
 
 function run(cmd, cmdArgs, cwd) {
   log(`$ ${cmd} ${cmdArgs.join(' ')}   (cwd=${path.relative(root, cwd) || '.'})`);
-  const r = spawnSync(cmd, cmdArgs, { cwd, stdio: 'inherit', shell: isWin, env: process.env });
+  const execution = cmd === 'npm' ? npmCommand(cmdArgs) : { command: cmd, args: cmdArgs, shell: false };
+  const r = spawnSync(execution.command, execution.args, { cwd, stdio: 'inherit', shell: false, env: process.env });
+  if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`${cmd} ${cmdArgs.join(' ')} 실패 (exit=${r.status})`);
 }
 function hashFiles(files) {
@@ -73,8 +75,8 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
 /* 0) Node 버전 */
 {
   const [maj, min] = process.versions.node.split('.').map(Number);
-  if (maj < 20 || (maj === 20 && min < 19)) {
-    warn(`Node.js ${process.versions.node} 감지 — 20.19 이상(권장 22 LTS 이상)이 필요합니다. https://nodejs.org`);
+  if (maj < 22 || (maj === 22 && min < 19)) {
+    warn(`Node.js ${process.versions.node} detected. This release requires Node.js 22.19 or later. https://nodejs.org`);
     process.exit(1);
   }
   log(`Node.js ${process.versions.node} OK`);
@@ -146,23 +148,15 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
 /* 2) 루트 의존성 */
 {
   const files = [path.join(root, 'package.json'), path.join(root, 'package-lock.json')];
-  const want = hashFiles(files);
-  const have = readHash('deps-root.hash');
-  const hasModules = fs.existsSync(path.join(root, 'node_modules', 'express', 'package.json'));
-  if (!hasModules || want !== have) {
-    if (!AUTO_INSTALL) warn('의존성 변경 감지 — --no-install 로 설치를 건너뜁니다.');
-    else {
-      log(hasModules ? 'package.json 변경 감지 → 의존성 설치' : 'node_modules 없음 → 의존성 설치');
-      try {
-        run('npm', ['install', '--no-audit', '--no-fund', '--omit=dev'], root);
-        writeHash('deps-root.hash', want);
-      } catch (e) {
-        // 사내망/오프라인처럼 레지스트리에 못 붙는 환경 — 이미 설치된 node_modules 가 있으면 그대로 진행한다.
-        if (!hasModules) throw new Error(`${e.message}\n  → 인터넷 연결(또는 사내 npm 미러 설정)을 확인하세요. npm config set registry <주소>`);
-        warn(`의존성 설치 실패 — 기존 node_modules 로 계속 진행합니다: ${e.message}`);
-      }
-    }
-  } else log('루트 의존성 최신 상태');
+  if (!installedDependenciesMatch(root)) {
+    if (!AUTO_INSTALL) throw new Error('Runtime dependencies do not match package-lock.json. Run npm ci before starting with --no-install.');
+    log('Preparing runtime dependencies');
+    // Preserve Electron/build tools previously installed by npm ci, even in production.
+    const mode = hasInstalledDevDependencies(root) ? '--include=dev' : '--omit=dev';
+    run('npm', ['install', '--no-audit', '--no-fund', mode], root);
+    if (!installedDependenciesMatch(root)) throw new Error('Runtime dependency validation failed after installation. Run npm ci and retry.');
+  } else log('Installed runtime dependencies match package-lock.json; skipping npm install');
+  writeHash('deps-root.hash', hashFiles(files));
 }
 
 /* 3) 관리자 콘솔 빌드 */
@@ -179,14 +173,13 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
     else if (!AUTO_BUILD) warn('콘솔 소스 변경 감지 — --no-build 로 빌드를 건너뜁니다.');
     else {
       log(hasDist ? '콘솔 소스 변경 감지 → vite build' : 'admin-client/dist 없음 → vite build');
-      const depWant = hashFiles([path.join(ac, 'package.json'), path.join(ac, 'package-lock.json')]);
-      const depHave = readHash('deps-admin-client.hash');
-      const hasMods = fs.existsSync(path.join(ac, 'node_modules', 'vite', 'package.json'));
-      if (!hasMods || depWant !== depHave) {
-        if (!AUTO_INSTALL) throw new Error('admin-client/node_modules 가 없어 빌드할 수 없습니다 (--no-install 해제 필요)');
-        run('npm', ['install', '--no-audit', '--no-fund'], ac);
-        writeHash('deps-admin-client.hash', depWant);
+      const dependencyFiles = [path.join(ac, 'package.json'), path.join(ac, 'package-lock.json')];
+      if (!installedDependenciesMatch(ac, { includeDev: true })) {
+        if (!AUTO_INSTALL) throw new Error('Console build dependencies do not match package-lock.json. Run npm ci in admin-client or enable automatic installation.');
+        run('npm', ['install', '--no-audit', '--no-fund', '--include=dev'], ac);
+        if (!installedDependenciesMatch(ac, { includeDev: true })) throw new Error('Console build dependencies do not match package-lock.json after installation.');
       }
+      writeHash('deps-admin-client.hash', hashFiles(dependencyFiles));
       run('npm', ['run', 'build'], ac);
       writeHash('admin-client.hash', want);
     }

@@ -15,6 +15,7 @@
  *   GET  /api/control/health                   control 서버 자체 헬스체크 (인증 불필요)
  */
 import express from 'express';
+import { requireHttps } from './core/requireHttps.js';
 import { originPolicy } from './core/originPolicy.js';
 import { assertCurrentAccount } from './core/accountState.js';
 import { verifyAccessToken } from './core/tokens.js';
@@ -22,7 +23,8 @@ import db from './database/db.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import logger from './util/logger.js';
-import config from './config/index.js';
+import config, { activeTransport } from './config/index.js';
+import transport from './core/transport.cjs';
 
 let controlDbReady = null;
 const AUTH_HEADER_RE = /^Bearer\s+(.+)$/i;
@@ -64,9 +66,10 @@ export function createControlApp(sup) {
 
   app.disable('x-powered-by');
   app.set('trust proxy', config.server.trustProxy ?? false);
+  app.use(requireHttps(config));
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  app.use(originPolicy(config, { additionalOrigins: [`http://127.0.0.1:${config.server.port}`, `http://localhost:${config.server.port}`] }));
+  app.use(originPolicy(config, { additionalOrigins: transport.certificateHosts(activeTransport).map(host => new URL(transport.urlFor(activeTransport.protocol, host, config.server.port)).origin) }));
   app.use(rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path === '/api/control/health' }));
   app.use(express.json({ limit: '1mb' }));
 

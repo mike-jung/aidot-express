@@ -18,7 +18,7 @@ on loopback unless an explicitly secured management network requires otherwise.
 | `HOST` | Server default is `0.0.0.0`; set `127.0.0.1` behind a local proxy. Electron supplies loopback by default. |
 | `ALLOWED_HOSTS` | Exact hostnames without schemes/ports; Electron defaults to loopback hostnames to limit DNS rebinding. Set explicitly for a management proxy. |
 | `CONTROL_HOST` | Keep `127.0.0.1`. |
-| `CORS_ORIGIN` | Empty means same-origin browser use. For separate frontends, provide exact origins separated by commas. `*` and reflective `true` are rejected. |
+| `CORS_ORIGIN` | Empty means same-origin browser use. For separate frontends, provide exact origins separated by commas. Legacy `*` entries are ignored with a startup warning; they never allow arbitrary origins. Reflective `true`, wildcard host patterns and malformed URLs are rejected. |
 | `AUTH_COOKIE_SECURE` | Use `true` with HTTPS. Local HTTP development requires `false`. |
 | `AUTH_COOKIE_SAMESITE` | Prefer `lax`; `none` requires secure cookies and an explicit origin policy. |
 | `TRUST_PROXY` | Trust only actual proxy hops or addresses supported by the configuration. A broadly trusted client-supplied forwarding header compromises IP and scheme decisions. |
