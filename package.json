@@ -1,6 +1,6 @@
 {
   "name": "aidot-express",
-  "version": "1.43.2",
+  "version": "1.43.3",
   "description": "Spring Boot 스타일 Node.js + Express 웹서버",
   "type": "module",
   "engines": {

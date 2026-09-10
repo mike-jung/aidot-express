@@ -1,3 +1,8 @@
+# Release 1.43.3
+
+Full source publication now connects fresh extractions to the existing private repository history.
+Read [the upgrade guide](docs/UPGRADE_1.43.3.md). This release includes the Public sync and Linux artifact isolation fixes.
+
 # Release notes
 
 - Workspace validation rejects framework-directory aliases, environment-line injection and linked paths on Windows and POSIX.

@@ -1,6 +1,6 @@
 # Build and release
 
-Version 1.43.2. Run commands from the project root. Install root and admin-client
+Version 1.43.3. Run commands from the project root. Install root and admin-client
 locked dependencies first. Windows NSIS builds require a Windows build environment;
 Linux AppImage builds need the supported Linux/WSL/Docker dependencies.
 
@@ -91,7 +91,32 @@ exits successfully without an empty commit. A failed publication retains its exp
 for inspection and reports failure instead of claiming completion.
 
 `npm run push` commits Full source only after the target repository is verified as
-private. Its dry run leaves the Git index and remotes unchanged.
+private with write access. Set `GITHUB_TOKEN` or `GH_TOKEN`, `GITHUB_REPO` and
+optionally `GITHUB_BRANCH` (default `main`). Its dry run needs no token and leaves
+the Git index and remotes unchanged; it does not check remote freshness.
+
+A fresh Full ZIP needs no manual `git init`, clone or pull. The command fetches
+the existing branch and uses that commit as the parent of the extracted files.
+Remote-only files are retained and restored locally: absence from a ZIP is not
+an instruction to delete a file. In an established checkout, explicit local
+deletions are committed normally. A branch missing from a populated remote is
+rejected to catch configuration mistakes.
+
+Every push fetches before comparing history. A checkout behind the remote is
+fast-forwarded; compatible divergent commits are merged. Conflicts are previewed
+before starting a merge, and the local commit remains available for resolution.
+An old extraction that already has an independent root stops with instructions;
+after reviewing both trees, `npm run push -- --link-history` allows a normal
+merge of those histories. Conflicting content is never chosen automatically.
+Recovery refs are recorded under `refs/aidot-backups/` before changing an existing
+local history. Origin identity, the selected branch and unfinished Git operations
+are checked. Existing Git hooks stay enabled, and pushes never use force.
+
+A non-fast-forward rejection indicates a remote history advance, not a cached
+password. Retry to fetch and integrate it; resolve any reported conflicts first.
+Authentication, network and branch-protection failures have separate guidance.
+The candidate tree and unpublished commit history are checked for excluded local
+files, including credentials that were committed and subsequently deleted.
 
 `npm run release:github` creates or updates a draft in `PUBLIC_REPO` and filters
 installers by the exact current version and Public filename convention. For internal

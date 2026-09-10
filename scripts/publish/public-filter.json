@@ -104,6 +104,7 @@
       "docs/BUILD_AND_RELEASE.md",
       "docs/UPGRADE_1.43.1.md",
       "docs/UPGRADE_1.43.2.md",
+      "docs/UPGRADE_1.43.3.md",
       "docs/WINDOWS_OPERATIONS.md"
     ],
     "tests/**": [
