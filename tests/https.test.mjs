@@ -56,6 +56,27 @@ test('missing files, mismatched keys and non-SAN server names fail configuration
   fs.writeFileSync(keyFile, generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }));
   assert.throws(() => transport.prepareTls({ ...generated.settings, keyFile }), /does not match/);
 });
+test('missing persisted TLS files identify all variables and resolved paths without changing files', () => {
+  const settings = { ...generated.settings, passphrase: 'do-not-log-this-passphrase' };
+  for (const field of ['keyFile', 'certFile', 'caFile']) settings[field] = `missing/${field}.pem`;
+  assert.throws(() => transport.prepareTls(settings, directory), error => {
+    assert.equal(error.code, 'AIDOT_HTTPS_CONFIG');
+    for (const field of ['keyFile', 'certFile', 'caFile']) {
+      assert.ok(error.message.includes(transport.ENV_KEYS[field]));
+      assert.ok(error.message.includes(JSON.stringify(path.join(directory, settings[field]))));
+    }
+    assert.match(error.message, /ENOENT/);
+    assert.ok(!error.message.includes(settings.passphrase));
+    return true;
+  });
+  assert.equal(fs.existsSync(path.join(directory, 'missing')), false);
+  assert.equal(transport.prepareTls({ ...settings, enabled: false }, directory).protocol, 'http');
+});
+test('relative TLS paths use the configuration directory and retain the original certificate identity', () => {
+  const settings = { ...generated.settings };
+  for (const field of ['keyFile', 'certFile', 'caFile']) settings[field] = path.relative(directory, settings[field]);
+  assert.equal(transport.prepareTls(settings, directory).certificate.fingerprint256, prepared.certificate.fingerprint256);
+});
 test('expired and not-yet-valid certificates are rejected', () => {
   const cert = new X509Certificate(fs.readFileSync(generated.settings.certFile));
   assert.throws(() => transport.assertCertificateTime(cert, Date.parse(cert.validTo)), /expired/);

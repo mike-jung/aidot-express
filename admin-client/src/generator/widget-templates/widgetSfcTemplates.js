@@ -49,7 +49,6 @@ export function genWidgetSfcs(lang) {
 
 const STAT_WIDGET = `<script setup>
 import { computed } from 'vue';
-import { genStrings } from '../genStrings.js';
 
 const props = defineProps({
   label: { type: String, default: '' },

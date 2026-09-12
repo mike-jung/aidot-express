@@ -10,7 +10,7 @@ and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
-![Version](https://img.shields.io/badge/version-1.45.0-orange)
+![Version](https://img.shields.io/badge/version-1.45.1-orange)
 
 </div>
 
@@ -66,7 +66,7 @@ npm start
 ```
 
 Open **http://localhost:7901** and log in with `admin` / `admin1234`
-(development only). Change the initial password before using protected console APIs.
+(development only). The initial-password reminder does not block authorized console features. You can change the password later in Settings.
 For production, set `ADMIN_INITIAL_PASSWORD` before the first start.
 
 ### Your first endpoint, in about a minute

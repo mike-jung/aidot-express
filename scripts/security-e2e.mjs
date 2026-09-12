@@ -26,7 +26,7 @@ const certificate = useHttps ? await certificates.generateCertificate({ baseDir:
 const prepared = transport.prepareTls(certificate?.settings || {});
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const edition = pkg.aidotEdition || 'full';
-let initial = `Initial-${crypto.randomBytes(12).toString('hex')}`;
+let initial = argv.includes('--default-password') ? 'admin1234' : `Initial-${crypto.randomBytes(12).toString('hex')}`;
 const changed = `Changed-${crypto.randomBytes(12).toString('hex')}`;
 const schema = `aidot_test_${crypto.randomBytes(6).toString('hex')}`;
 const values = {
@@ -114,8 +114,21 @@ try {
   const bootstrap = await login('admin', initial);
   assert.equal(bootstrap.user.mustChangePassword, true);
   await expectStatus('bootstrap identity is readable', '/api/admin/auth/me', 200, bootstrap);
-  await expectStatus('bootstrap privileged operation denied', '/api/admin/users/paged', 403, bootstrap);
-  await expectStatus('bootstrap control operation denied', '/api/control/status', 403, { ...bootstrap, controlApi: true });
+  await expectStatus('initial password permits authorized console operation', '/api/admin/users/paged', 200, bootstrap);
+  await expectStatus('initial password permits authorized control status', '/api/control/status', 200, { ...bootstrap, controlApi: true });
+  await expectStatus('initial password permits monitoring', '/api/admin/metrics/current', 200, bootstrap);
+  await expectStatus('initial password permits SSE ticket', '/api/admin/sse/ticket', 200, { ...bootstrap, method: 'POST' });
+  const beforeInitialRestart = await request('/api/control/status', { ...bootstrap, controlApi: true });
+  const previousPid = beforeInitialRestart.body.data.pid;
+  await expectStatus('initial password permits worker restart', '/api/control/restart', 200, { ...bootstrap, controlApi: true, method: 'POST' });
+  await ready();
+  const afterInitialRestart = await expectStatus('initial password permits control after worker restart', '/api/control/status', 200, { ...bootstrap, controlApi: true });
+  assert.ok(previousPid && afterInitialRestart.body.data.pid && previousPid !== afterInitialRestart.body.data.pid, 'worker process actually changed');
+  await expectStatus('initial password session survives worker restart', '/api/admin/auth/me', 200, bootstrap);
+  const restartedBootstrap = await login('admin', initial);
+  assert.equal(restartedBootstrap.user.mustChangePassword, true, 'restart retains the advisory warning');
+  await expectStatus('initial password permits monitoring after worker restart', '/api/admin/metrics/current', 200, bootstrap);
+  await expectStatus('initial password permits SSE ticket after worker restart', '/api/admin/sse/ticket', 200, { ...bootstrap, method: 'POST' });
   await expectStatus('initial password change', '/api/admin/users/me/password', 200, { ...bootstrap, method: 'PUT', body: { currentPassword: initial, newPassword: changed } });
   await expectStatus('old access token rejected after password change', '/api/admin/auth/me', 401, bootstrap);
   await expectStatus('old refresh token rejected after password change', '/api/admin/auth/refresh', 401, { ...bootstrap, method: 'POST' });

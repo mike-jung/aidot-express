@@ -116,6 +116,28 @@ Keep CA/key files outside shared upload or web-served directories. Certificate p
 
 Control access also depends on `CONTROL_HOST`, firewall rules and routing. Remote consoles need a reachable, secured Control endpoint; enabling TLS alone does not configure firewall rules.
 
+## Upgrades and missing certificate files
+
+The Full ZIP contains application files. Your `.env`, database, private keys and generated `certs/` directory are installation data and must be retained separately. Copying only `.env` into a fresh release directory does not copy the certificates it references. The Patch ZIP preserves existing certificates; it cannot recover files that are already missing.
+
+When `HTTPS_ENABLED=true`, `npm start` now checks the same configuration as the supervisor **before** the console build. A missing file lists its environment variable and absolute path. `HTTPS_KEY_FILE`, `HTTPS_CERT_FILE` and `HTTPS_CA_FILE` are checked together. The server keeps HTTPS enabled and exits with code 1 until the configuration is repaired.
+
+1. Restore the original `certs` directory from your installation/backup, or correct the three file paths in the active `.env`.
+2. Run `npm run https:check` (add `-- --env "path/to/.env"` for another configuration).
+3. Run `npm start` again.
+
+If the original certificates cannot be recovered and this is a local development installation, explicitly generate replacements:
+
+```powershell
+npm run https:cert -- --hosts localhost,127.0.0.1,::1 --apply
+npm run https:check
+npm start
+```
+
+This creates new files and backs up `.env` while preserving DB/auth settings. It also creates a **new CA**, so clients must trust the new CA. Include any additional real connection names in `--hosts`; use your existing certificate management process for production.
+
+For a movable installation, use paths relative to the directory containing the active `.env` and move `.env` and `certs` together. An absolute path continues to reference its original directory after a move. The server does not guess another certificate location or generate replacement keys automatically.
+
 ## Troubleshooting
 
 | Symptom | Check |

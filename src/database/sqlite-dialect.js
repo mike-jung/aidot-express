@@ -126,6 +126,9 @@ export function rewriteForSqlite(sql) {
   if (typeof sql !== 'string') return sql;
   let out = sql;
 
+  // Trace batches use INSERT IGNORE; keep their shared SQL unchanged.
+  out = out.replace(/^(\s*(?:(?:--[^\n]*\n|\/\*[\s\S]*?\*\/)\s*)*)INSERT\s+IGNORE\s+INTO\b/i, '$1INSERT OR IGNORE INTO');
+
   if (/\bDATE_(ADD|SUB)\s*\(/i.test(out)) {
     out = out.replace(INTERVAL_RE, (_m, op, expr, amt, unit) => {
       const sign = op.toUpperCase() === 'ADD' ? '+' : '-';

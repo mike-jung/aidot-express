@@ -30,11 +30,15 @@ import { installLeaveHint } from './utils/leaveHint';   // ★ v1.18.0
 
 const app = createApp(App);
 app.use(createPinia());
-app.use(router);
 
 // 부팅 시 silent refresh — 쿠키만 있으면 자동 로그인
 const auth = useAuthStore();
-auth.silentRefresh().finally(() => app.mount('#app'));
+auth.silentRefresh().finally(async () => {
+  // Resolve cookie authentication before the router's first requiresAuth guard.
+  app.use(router);
+  await router.isReady();
+  app.mount('#app');
+});
 
 /* ★ v1.18.0 — 화면을 떠날 때 서버에 힌트를 보낸다 (신뢰하지 않고 참고만 쓰인다) */
 installLeaveHint();

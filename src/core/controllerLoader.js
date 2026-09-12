@@ -2,7 +2,7 @@ import { assertCurrentAccount } from './accountState.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import express from 'express';
+import express from './httpApp.js';
 import config from '../config/index.js';
 import { existingDirs } from './appPaths.js';
 import { META } from './decorators.js';

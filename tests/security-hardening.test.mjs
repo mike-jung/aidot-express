@@ -122,7 +122,14 @@ test('persistent account version blocks old tokens independently of process memo
     await assert.rejects(assertCurrentAccount(user, { executor }), { status: 401 });
     await assertCurrentAccount({ ...user, ver: 1 }, { executor });
     db.exec('UPDATE admin_users SET must_change_password=1');
-    await assert.rejects(assertCurrentAccount({ ...user, ver: 1 }, { executor, method: 'POST', path: '/api/admin/sqls/test' }), { status: 403 });
+    for (const [method, path] of [
+      ['GET', '/api/admin/metrics/current'], ['POST', '/api/admin/sse/ticket'],
+      ['GET', '/api/admin/users/paged'], ['POST', '/api/admin/sqls/test'],
+      ['GET', '/api/control/status'],
+    ]) {
+      const account = await assertCurrentAccount({ ...user, ver: 1 }, { executor, method, path });
+      assert.equal(Number(account.must_change_password), 1, 'initial-password warning does not deny an authorized account');
+    }
     await assertCurrentAccount({ ...user, ver: 1 }, { executor, method: 'PUT', path: '/api/admin/users/me/password' });
     db.exec("UPDATE admin_users SET status='disabled'");
     await assert.rejects(assertCurrentAccount({ ...user, ver: 1 }, { executor }), { status: 401 });

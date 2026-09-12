@@ -6,6 +6,7 @@
  *   0) Node 버전 확인 (>= 22.19)
  *   1) .env 가 없으면 .env.example 을 복사해 생성 (AUTH_ACCESS_SECRET 은 랜덤 값 자동 주입)
  *   2) 루트 의존성: lockfile과 설치된 필수 패키지를 비교하고 불일치할 때만 `npm install`
+ *   2a) 실제 서버 설정/TLS 검증 — 인증서 누락 시 콘솔 빌드 전에 복구 방법 안내
  *   3) 관리자 콘솔(admin-client):
  *        - admin-client/src, index.html, vite.config.js, public 의 내용 해시가 바뀌었거나 dist 가 없으면 `vite build`
  *        - 빌드가 필요한데 설치된 빌드 의존성이 lockfile과 다르면 먼저 `npm install`
@@ -157,6 +158,21 @@ const writeHash = (name, v) => { fs.mkdirSync(cacheDir, { recursive: true }); fs
     if (!installedDependenciesMatch(root)) throw new Error('Runtime dependency validation failed after installation. Run npm ci and retry.');
   } else log('Installed runtime dependencies match package-lock.json; skipping npm install');
   writeHash('deps-root.hash', hashFiles(files));
+}
+
+/* 실제 서버와 같은 설정 로더로 검증. 별도 프로세스로 부모 환경을 오염시키지 않는다. */
+{
+  const result = spawnSync(process.execPath, ['scripts/startup-config.mjs'], {
+    cwd: root, env: process.env, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) {
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    if (result.error) warn(`Configuration check could not complete: ${result.error.message}`);
+    process.exit(1);
+  }
+  const status = result.stdout.split('\n').find(line => line.startsWith('[start] Configuration valid:'));
+  if (status) process.stdout.write(status + '\n');
 }
 
 /* 3) 관리자 콘솔 빌드 */

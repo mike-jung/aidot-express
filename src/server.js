@@ -1,4 +1,4 @@
-import express from 'express';
+import express from './core/httpApp.js';
 import { requireHttps } from './core/requireHttps.js';
 import { originPolicy } from './core/originPolicy.js';
 import { redactUrl } from './core/logRedaction.js';
@@ -83,6 +83,7 @@ export function summarizeMci() {
 
 export async function createServer() {
   const app = express();
+  app.set('bodyLimit', config.server.bodyLimit);
   startLoopLagMonitor();
 
   // === 기본 보안 헤더 ===

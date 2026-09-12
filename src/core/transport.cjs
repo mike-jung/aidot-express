@@ -39,11 +39,18 @@ function certificateMatches(cert, host) {
 function certificateInfo(cert) {
   return { subject: cert.subject, issuer: cert.issuer, subjectAltName: cert.subjectAltName || '', validFrom: new Date(cert.validFrom).toISOString(), validTo: new Date(cert.validTo).toISOString(), fingerprint256: cert.fingerprint256 };
 }
-function readCertificateFile(file, label) {
-  if (!file || /[\x00-\x1f]/.test(file)) throw new Error(`${label} path is required`);
-  const stat = fs.statSync(file);
-  if (!stat.isFile() || stat.size > 1024 * 1024) throw new Error(`${label} must be a PEM file smaller than 1 MiB`);
-  return fs.readFileSync(file);
+function readCertificateFile(file, variable) {
+  if (!file || /[\x00-\x1f\x7f]/.test(file)) throw new Error(`${variable}: a valid file path is required`);
+  try {
+    const stat = fs.statSync(file);
+    if (!stat.isFile() || stat.size > 1024 * 1024) throw new Error('must be a PEM file smaller than 1 MiB');
+    return fs.readFileSync(file);
+  } catch (error) {
+    const reason = error.code === 'ENOENT' ? 'file not found (ENOENT)'
+      : ['EACCES', 'EPERM'].includes(error.code) ? `file is not readable (${error.code})`
+      : error.code || error.message;
+    throw new Error(`${variable}: ${reason}: ${JSON.stringify(file)}`);
+  }
 }
 function assertCertificateTime(cert, now = Date.now()) {
   if (now < Date.parse(cert.validFrom) || now >= Date.parse(cert.validTo)) throw new Error('HTTPS certificate is expired or not valid yet');
@@ -56,8 +63,15 @@ function prepareTls(settings = {}, baseDir = process.cwd()) {
     resolved[key] = settings[key] ? path.resolve(baseDir, settings[key]) : '';
   }
   try {
-    const key = readCertificateFile(resolved.keyFile, 'HTTPS private key');
-    const cert = readCertificateFile(resolved.certFile, 'HTTPS certificate');
+    // Report every missing configured file, without printing key/passphrase contents.
+    const files = {}, problems = [];
+    for (const field of ['keyFile', 'certFile', 'caFile']) {
+      if (field === 'caFile' && !resolved[field]) continue;
+      try { files[field] = readCertificateFile(resolved[field], ENV_KEYS[field]); }
+      catch (error) { problems.push(error.message); }
+    }
+    if (problems.length) throw new Error(problems.join('\n'));
+    const { keyFile: key, certFile: cert, caFile: ca } = files;
     const leaf = new X509Certificate(cert);
     assertCertificateTime(leaf);
     if (!leaf.subjectAltName) throw new Error('HTTPS certificate needs a Subject Alternative Name (SAN)');
@@ -70,7 +84,6 @@ function prepareTls(settings = {}, baseDir = process.cwd()) {
     }
     if (!serverName || !certificateMatches(leaf, serverName)) throw new Error('HTTPS_SERVER_NAME must match a DNS name or IP in the certificate SAN');
     resolved.serverName = serverName;
-    const ca = resolved.caFile ? readCertificateFile(resolved.caFile, 'HTTPS client CA') : null;
     if (ca) new X509Certificate(ca);
     // Validate the PEM chain/key before either listener starts. Never fall back to HTTP.
     const options = { key, cert, passphrase: settings.passphrase || undefined, minVersion: 'TLSv1.2' };
@@ -79,7 +92,9 @@ function prepareTls(settings = {}, baseDir = process.cwd()) {
       clientCa: ca ? [...tls.rootCertificates, ca] : leaf.subject === leaf.issuer ? [...tls.rootCertificates, cert] : undefined,
       certificate: certificateInfo(leaf) };
   } catch (error) {
-    throw new Error(`HTTPS configuration is invalid: ${error.code || error.message}`);
+    const failure = new Error(`HTTPS configuration is invalid:\n${error.message}\nCertificate path base: ${JSON.stringify(path.resolve(baseDir))}\nRestore the configured certificate files or correct HTTPS_KEY_FILE / HTTPS_CERT_FILE / HTTPS_CA_FILE in the active .env. See docs/HTTPS.md.`);
+    failure.code = 'AIDOT_HTTPS_CONFIG';
+    throw failure;
   }
 }
 function createListener(app, prepared) {

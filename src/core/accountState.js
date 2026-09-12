@@ -1,12 +1,7 @@
 import db from '../database/db.js';
 
-const PASSWORD_SETUP_ROUTES = new Set([
-  'GET /api/admin/auth/me', 'GET /api/admin/users/me',
-  'PUT /api/admin/users/me/password', 'POST /api/admin/auth/logout-all',
-]);
-
 /** Check persistent state so revocations survive restarts and cross process boundaries. */
-export async function assertCurrentAccount(user, { method = '', path = '', executor = db } = {}) {
+export async function assertCurrentAccount(user, { executor = db } = {}) {
   const realm = user?.realm;
   if (!['admin', 'user'].includes(realm)) throw Object.assign(new Error('Invalid account realm'), { status: 401 });
   const id = Number(user.id ?? user.sub);
@@ -23,9 +18,9 @@ export async function assertCurrentAccount(user, { method = '', path = '', execu
     || Number(account.token_version) !== Number(user.ver ?? user.token_version ?? 0)) {
     throw Object.assign(new Error('Session revoked. Please sign in again.'), { status: 401, code: 'ACCOUNT_REVOKED' });
   }
-  if (realm === 'admin' && Number(account.must_change_password)
-    && !PASSWORD_SETUP_ROUTES.has(`${method} ${path.replace(/\/$/, '')}`)) {
-    throw Object.assign(new Error('Change your initial password before using the console'), { status: 403, code: 'PASSWORD_CHANGE_REQUIRED' });
-  }
+  // Compatibility contract: must_change_password is an advisory console flag.
+  // Keep it in the account/login/refresh data so the warning remains visible,
+  // while authorized API, control and SSE operations continue to work.
+  // Role, account status and token-version validation above still apply.
   return account;
 }

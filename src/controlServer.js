@@ -14,7 +14,7 @@
  *   POST /api/control/restart                  중지 후 시작
  *   GET  /api/control/health                   control 서버 자체 헬스체크 (인증 불필요)
  */
-import express from 'express';
+import express from './core/httpApp.js';
 import { requireHttps } from './core/requireHttps.js';
 import { originPolicy } from './core/originPolicy.js';
 import { assertCurrentAccount } from './core/accountState.js';
@@ -63,6 +63,7 @@ async function authMiddleware(req, res, next) {
 /** control 서버 Express 앱 생성. supervisor 의 상태/조작 함수를 주입받음. */
 export function createControlApp(sup) {
   const app = express();
+  app.set('bodyLimit', '1mb');
 
   app.disable('x-powered-by');
   app.set('trust proxy', config.server.trustProxy ?? false);
