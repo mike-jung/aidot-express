@@ -86,6 +86,9 @@ export function assertPublicOutputPaths(names, policy) {
     const decision = publicPathDecision(destination, policy);
     if (!decision.included || (name.startsWith('stubs/') && decision.source !== name)) throw new Error(`Path is outside the Public allowlist: ${name}`);
   }
+  for (const name of policy.requiredFiles || []) {
+    if (!names.includes(name)) throw new Error(`Required Public runtime file is missing from the snapshot: ${name}`);
+  }
 }
 
 /** Return the reviewed source/destination pairs, never falling back to Full bytes. */
@@ -103,6 +106,10 @@ export function publicEntries(root, policy = readPolicy(root)) {
     if (fs.lstatSync(abs).isSymbolicLink()) throw new Error(`Public output cannot contain symlinks: ${rel}`);
     entries.push({ source, destination: rel });
   }
+  const selected = new Set(entries.map(entry => entry.destination));
+  for (const name of policy.requiredFiles || []) {
+    if (!selected.has(name)) throw new Error(`Required Public runtime file is missing or excluded: ${name}`);
+  }
   return entries;
 }
 
@@ -119,6 +126,8 @@ export function scanEntries(root, entries, policy = readPolicy(root)) {
   const exempt = (policy.scanExempt || []).map(globRegex);
   const patterns = Object.entries(policy.scan || {}).filter(([key]) => !key.startsWith('_')).map(([key, value]) => [key, new RegExp(value)]);
   const problems = [];
+  const packageFile = path.join(root, 'package.json');
+  const version = fs.existsSync(packageFile) ? JSON.parse(fs.readFileSync(packageFile, 'utf8')).version : null;
   for (const { source, destination } of entries) {
     const abs = path.join(root, source);
     if (fs.lstatSync(abs).isSymbolicLink()) throw new Error(`Public symlink: ${destination}`);
@@ -126,6 +135,10 @@ export function scanEntries(root, entries, policy = readPolicy(root)) {
     if (/\.(json|csv|tsv|sql)$/i.test(destination) && !/package(-lock)?\.json$/.test(destination) && bytes.length > policy.maxDataFileBytes) problems.push(`${destination}: oversized data file`);
     if (exempt.some((re) => re.test(destination)) || /\.(png|jpe?g|gif|ico|woff2?|ttf|pdf|pptx)$/i.test(destination)) continue;
     const text = bytes.toString('utf8');
+    if (destination === 'README.md') {
+      const badge = text.match(/https:\/\/img\.shields\.io\/badge\/version-([0-9A-Za-z.+-]+)-orange/);
+      if (version && badge && badge[1] !== version) problems.push('README.md: version badge differs from package.json');
+    }
     const secret = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{30,}\b/.test(text);
     if (secret) problems.push(`${destination}: embedded credential`);
     for (const hit of scanText(text)) { problems.push(`${destination}:${hit.line}: ${hit.label}`); break; }

@@ -1,5 +1,5 @@
 {
-  "version": "1.45.2",
+  "version": "1.45.3",
   "edition": "public",
   "files": [
     {
@@ -20,11 +20,11 @@
     },
     {
       "path": "NOTICE",
-      "sha256": "7bf4562f23348ba48add6ee2d99070256aa6ed97b7529ce63bd759f1cd37fb91"
+      "sha256": "8608d5e282db47bf62661be5e7bdf600ba9d6f528bc153949facf9ee33adfd6c"
     },
     {
       "path": "README.md",
-      "sha256": "a538979ec9bfe28d3f70bc6c141ba55cf3c05bb9d47ada11508f2f577dd5d157"
+      "sha256": "8f7f10db78fc01cfe3d2ce8163cacc621581e630294201f2231d9fbfe2efa2c2"
     },
     {
       "path": "admin-client/.gitignore",
@@ -936,7 +936,7 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "c9ca89715db61f1f30dd6edca27242433a44a30288ad2af8b21be2769e2b49bb"
+      "sha256": "43269bef1df46e3d5a04a03b7bcf834f6d7ecbfdd05c64516e374caf7019c496"
     },
     {
       "path": "public/demo/guestbook-lab.html",
@@ -1036,11 +1036,11 @@
     },
     {
       "path": "scripts/publish/policy.mjs",
-      "sha256": "2982ae1ecc702034b7ffc941692f92ae9fd4c6c8aaa52129cebd0a9798034cb0"
+      "sha256": "d6ab372cc6c2f4f7f15c5b61593e81c8356a41baf0326bd800e089668b117c0a"
     },
     {
       "path": "scripts/publish/public-filter.json",
-      "sha256": "32847f88e2da7f59be72fa69b5f295d5fc6a75b282cf8fbffb1d23ec145d7838"
+      "sha256": "8a3c11436e877e66edb33c45c076bf1d42aa6b29f29132c6a93a7c5262d02778"
     },
     {
       "path": "scripts/security-e2e.mjs",
@@ -1097,6 +1097,10 @@
     {
       "path": "scripts/start.mjs",
       "sha256": "a596a3b5b05734b3ab0a1ba3f24dd5f4afd2d8c3dfc0718fefd423b07428a6da"
+    },
+    {
+      "path": "scripts/startup-config.mjs",
+      "sha256": "6cb1de11fa7bf4ea10926dfc3710b2d8bb59d4680de1ba4466c5bf3ab96f260f"
     },
     {
       "path": "scripts/startup-dependencies.mjs",
@@ -1272,11 +1276,11 @@
     },
     {
       "path": "src/core/ha/agent.js",
-      "sha256": "c7c3f6147533c334be50929ae1eb3bc4d8007fa71af27c056598545c6803b858"
+      "sha256": "4ad88e8ceb4e57726d9326959680d16acee8ebcdd8f228ed6dad751381032945"
     },
     {
       "path": "src/core/ha/index.js",
-      "sha256": "73aef23ea90d818cbda819d92b9b367532a68d8c13d00c8ec70ce5a4a99e4694"
+      "sha256": "4966d6c757b3c68d3f5eb0fc9625802acbedc526c5563ed503bbf106f59a88e6"
     },
     {
       "path": "src/core/ha/readOnlyGuard.js",
@@ -1632,7 +1636,7 @@
     },
     {
       "path": "src/util/version.js",
-      "sha256": "b68ff48fde932adce6315c050f11f932424be31265fb27b5c4a2217f74223292"
+      "sha256": "189f23a7d6993c93ffef9bebbc021445868995bd9c6ffe4b3562d8614096b09e"
     },
     {
       "path": "src/watchdog.js",
@@ -1692,7 +1696,7 @@
     },
     {
       "path": "admin-client/dist/aidot-edition.json",
-      "sha256": "14c6b0a0f9ff60b9a664700a6802ececfaf0bf3383b23e86ab01602765974981"
+      "sha256": "3932f88e7b000c60ace7f64a737d7ce4675b934a9a2e81550a5e76b698b80441"
     },
     {
       "path": "admin-client/dist/assets/AccessStatsPage-7N2q3X6o.js",
@@ -2236,7 +2240,7 @@
     },
     {
       "path": "stubs/README.md",
-      "sha256": "a538979ec9bfe28d3f70bc6c141ba55cf3c05bb9d47ada11508f2f577dd5d157"
+      "sha256": "8f7f10db78fc01cfe3d2ce8163cacc621581e630294201f2231d9fbfe2efa2c2"
     },
     {
       "path": "stubs/docs/BUILD_AND_RELEASE.md",
@@ -2264,11 +2268,11 @@
     },
     {
       "path": "stubs/src/core/ha/agent.js",
-      "sha256": "c7c3f6147533c334be50929ae1eb3bc4d8007fa71af27c056598545c6803b858"
+      "sha256": "4ad88e8ceb4e57726d9326959680d16acee8ebcdd8f228ed6dad751381032945"
     },
     {
       "path": "stubs/src/core/ha/index.js",
-      "sha256": "73aef23ea90d818cbda819d92b9b367532a68d8c13d00c8ec70ce5a4a99e4694"
+      "sha256": "4966d6c757b3c68d3f5eb0fc9625802acbedc526c5563ed503bbf106f59a88e6"
     },
     {
       "path": "stubs/src/core/ha/readOnlyGuard.js",
@@ -2320,7 +2324,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "de67a85c7053b81f9f10262343093a991d83a6ba852d3d00517bfe5a168dcb8d"
+      "sha256": "2302a47a9ed6024a9b573eaac965d0f3db685d18b8e88091131414c8631f35a3"
     },
     {
       "path": "admin-client/package.json",

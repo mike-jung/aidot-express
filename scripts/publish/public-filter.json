@@ -72,7 +72,8 @@
     "src/service/{BloodPressure,BloodSugar,Weight,Person}Service.js",
     "src/database/sql/{bloodPressure,bloodSugar,weight,person}.sql",
     "src/database/migrations/009_samples_deprecated.sql",
-    "public/uploads/**"
+    "public/uploads/**",
+    ".env.publish.example"
   ],
   "scan": {
     "_comment": [
@@ -159,7 +160,8 @@
       "scripts/windows/install-service.ps1",
       "scripts/windows/uninstall-service.ps1",
       "scripts/https-cert.mjs",
-      "scripts/server/**"
+      "scripts/server/**",
+      "scripts/startup-config.mjs"
     ],
     "workspace/**": [
       "workspace/README.md"
@@ -266,5 +268,10 @@
     "server:configure",
     "server:run",
     "server:health"
+  ],
+  "requiredFiles": [
+    "scripts/start.mjs",
+    "scripts/startup-dependencies.mjs",
+    "scripts/startup-config.mjs"
   ]
 }

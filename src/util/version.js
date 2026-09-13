@@ -2,9 +2,9 @@
  * src/util/version.js — 버전/빌드 정보의 단일 출처(single source of truth)
  *
  *  우선순위
- *    1) build-info.json   : 배포 패키지를 만들 때 scripts/release.mjs 가 심어 둔 정보
+ *    1) package.json     : 실행 버전의 기준. 같은 버전의 build-info.json만 함께 사용한다.
+ *    2) build-info.json   : package.json이 없는 배포본의 보조 정보
  *                           { version, builtAt, channel, artifact }
- *    2) package.json      : 소스에서 직접 실행할 때 (개발 중)
  *    3) 'unknown'
  *
  *  왜 파일을 하나 더 두나?
@@ -28,7 +28,8 @@ export function getVersionInfo() {
   if (cached) return cached;
 
   const build = readJson(path.join(projectRoot, 'build-info.json'));
-  if (build?.version) {
+  const pkg = readJson(path.join(projectRoot, 'package.json'));
+  if (build?.version && (!pkg?.version || build.version === pkg.version)) {
     cached = {
       version: build.version,
       builtAt: build.builtAt || null,
@@ -39,7 +40,6 @@ export function getVersionInfo() {
     return cached;
   }
 
-  const pkg = readJson(path.join(projectRoot, 'package.json'));
   cached = {
     version: pkg?.version || process.env.npm_package_version || 'unknown',
     builtAt: null,
