@@ -89,3 +89,7 @@ npm run check:i18n    # compare locale keys
 ```
 
 Also check the running console in a browser after changing screen behavior.
+
+For a fresh Electron installation, the initial sign-in window also defaults to
+`admin` / `admin1234` and supports copying or generating a password. Standalone
+production servers continue to use a configured or generated initial password.

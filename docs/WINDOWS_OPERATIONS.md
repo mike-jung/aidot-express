@@ -57,3 +57,12 @@ are rejected. See [Build and run](BUILD_AND_RELEASE.md).
 ## Independent server packages (1.45.0)
 
 See [SERVER_INSTALL.md](SERVER_INSTALL.md) for the supported Node.js service packaging path. It avoids Electron runtime dependencies and separates application versions from configuration and data.
+
+## Initial administrator sign-in (1.45.4)
+
+A fresh desktop database starts with `admin` / `admin1234`, unless
+`ADMIN_INITIAL_PASSWORD` was explicitly configured. Use the copy icon beside the
+password to copy it. **임의 생성** (Generate random password) immediately applies and
+displays a new random password. Copy the result before selecting **로그인 화면으로**.
+Existing accounts are preserved during upgrades. A successful password change
+removes the bootstrap credential file and invalidates previous sessions.

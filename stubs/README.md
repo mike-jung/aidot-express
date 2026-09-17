@@ -10,7 +10,7 @@ and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
-![Version](https://img.shields.io/badge/version-1.45.3-orange)
+![Version](https://img.shields.io/badge/version-1.45.4-orange)
 
 </div>
 
@@ -109,6 +109,11 @@ npm run dist:win      # Windows installer (NSIS, x64)
 npm run dist:linux    # Linux AppImage (x64)
 npm run dist:all      # both
 ```
+
+A fresh desktop database starts with `admin` / `admin1234`. The initial sign-in
+window includes a password copy icon and **Generate random password**, which applies
+the new password immediately. An explicit `ADMIN_INITIAL_PASSWORD` takes precedence;
+existing accounts are preserved.
 
 These check that the build tools are actually installed before they start, and install
 them if not. `electron` is over 200 MB, so the first run takes a few minutes.

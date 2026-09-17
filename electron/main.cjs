@@ -1,6 +1,8 @@
 const transport = require('../src/core/transport.cjs');
 const httpsConfig = require('../src/core/httpsConfig.cjs');
 const externalServer = require('./external-server.cjs');
+const { showInitialPassword } = require('./initial-password.cjs');
+const { createPasswordClient } = require('./initial-password-client.cjs');
 const { ensureEnvSecret } = require('../src/core/secretPolicy.cjs');
 const { sameOrigin, assertSender, trustedSender, lockLocalWindow, validateSetup, envLine } = require('./security.cjs');
 /**
@@ -460,10 +462,15 @@ app.whenReady().then(async () => {
     const initialFile = path.join(app.getPath('userData'), 'initial-admin-credentials.json');
     if (!serverExternal && fs.existsSync(initialFile)) {
       const initial = JSON.parse(fs.readFileSync(initialFile, 'utf8'));
-      await dialog.showMessageBox(mainWin, {
-        type: 'info', title: 'Initial administrator sign-in',
-        message: `Username: ${initial.username}`,
-        detail: `Initial password: ${initial.password}\n\nChange this password after signing in.`, buttons: ['Continue'],
+      const prepared = externalServer.prepareConnection({ AIDOT_SERVER_PORT: String(serverPort),
+        HTTPS_ENABLED: String(serverTransport.enabled), HTTPS_SERVER_NAME: serverTransport.hostname,
+        HTTPS_CA_FILE: serverTransport.enabled ? (result.tls?.caFile || result.tls?.certFile || '') : '',
+      }, app.getPath('userData'));
+      const initialEnv = { ...process.env, ...httpsConfig.readEnv(clientFile) };
+      const passwordClient = createPasswordClient({ prepared, port: serverPort,
+        minLength: initialEnv.AUTH_MIN_PASSWORD_LENGTH || 20 });
+      await showInitialPassword({ parent: mainWin, credential: initial,
+        regenerate: credential => passwordClient.regenerate(credential),
       });
     }
     notifyToast(`${APP_NAME} 시작됨`, `서버가 포트 ${serverPort} 에서 실행 중입니다.`);

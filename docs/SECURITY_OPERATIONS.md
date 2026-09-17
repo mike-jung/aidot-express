@@ -12,7 +12,7 @@ on loopback unless an explicitly secured management network requires otherwise.
 | Setting | Behavior / operational choice |
 | --- | --- |
 | `AUTH_ACCESS_SECRET` | Use an independently generated secret; store it outside source control. Rotating it signs out existing JWT sessions. |
-| `ADMIN_INITIAL_PASSWORD` | Set a unique initial password before first startup. Initial-password accounts can only complete password setup and inspect their own identity. |
+| `ADMIN_INITIAL_PASSWORD` | Sets the first administrator password. Initial-password accounts show a reminder and may use APIs allowed by their role. |
 | `ADMIN_SIGNUP_OPEN` | Keep `false` after controlled provisioning. |
 | `AUTH_SIGNUP_OPEN` | Disable if the business application does not need self-registration. |
 | `HOST` | Server default is `0.0.0.0`; set `127.0.0.1` behind a local proxy. Electron supplies loopback by default. |
@@ -35,9 +35,14 @@ rejects cross-site unsafe browser requests without an Origin when that header is
 present. These checks do not replace authentication, TLS or protection from XSS.
 For local Vite development, explicitly allow the actual Vite origin and port.
 
-For a fresh production database without `ADMIN_INITIAL_PASSWORD`, a random bootstrap
-credential is saved in `initial-admin-credentials.json` under Electron userData (desktop)
-or `data/` (server). The desktop shows it locally. Restrict this directory to the
+For a fresh Electron-owned database without `ADMIN_INITIAL_PASSWORD`, the account is
+`admin` / `admin1234`. Its local sign-in window provides a copy icon and a random
+password button. Generating applies the password immediately through authenticated
+password change; copy it before closing the window. Explicit initial-password settings
+and existing accounts are preserved. Standalone production servers still generate a
+random bootstrap password when none is configured. Initial credentials are saved in
+`initial-admin-credentials.json` under the selected data directory (`userData` for the
+desktop, `AIDOT_DATA_DIR` or `data/` for the server). Restrict this directory to the
 service account; POSIX files are created with mode 0600, and Windows relies on the
 user-profile ACL. The file is deleted after that account changes its password.
 Credentials are not printed through supervisor logs. Replace any historical known
