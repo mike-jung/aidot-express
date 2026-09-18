@@ -34,11 +34,14 @@
  *    />
  */
 import { ref, watch } from 'vue';
+import { useI18n } from '../composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
-  title:       { type: String,  default: '입력' },
+  title:       { type: String,  default: '' },
   params:      { type: Array,   default: () => [] },
-  submitLabel: { type: String,  default: '저장' },
+  submitLabel: { type: String,  default: '' },
   initial:     { type: Object,  default: () => ({}) },
   busy:        { type: Boolean, default: false },
   error:       { type: String,  default: '' },
@@ -88,8 +91,8 @@ function onSubmit() {
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">{{ title }}</h5>
-          <button type="button" class="btn-close" @click="emit('close')" :disabled="busy"></button>
+          <h5 class="modal-title">{{ title || t('common.input') }}</h5>
+          <button type="button" class="btn-close" :aria-label="t('common.close')" @click="emit('close')" :disabled="busy"></button>
         </div>
         <form @submit.prevent="onSubmit">
           <div class="modal-body">
@@ -120,7 +123,7 @@ function onSubmit() {
                        type="checkbox"
                        class="form-check-input"
                        :disabled="busy" />
-                <label class="form-check-label small">예 / 아니오</label>
+                <label class="form-check-label small">{{ t('common.yes') }} / {{ t('common.no') }}</label>
               </div>
 
               <textarea v-else-if="p.type === 'textarea'"
@@ -147,10 +150,10 @@ function onSubmit() {
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="emit('close')" :disabled="busy">취소</button>
+            <button type="button" class="btn btn-secondary" @click="emit('close')" :disabled="busy">{{ t('common.cancel') }}</button>
             <button type="submit" class="btn btn-primary" :disabled="busy">
               <span v-if="busy" class="spinner-border spinner-border-sm me-2" role="status"></span>
-              {{ submitLabel }}
+              {{ submitLabel || t('common.save') }}
             </button>
           </div>
         </form>

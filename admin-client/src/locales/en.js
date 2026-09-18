@@ -642,6 +642,7 @@ export default {
     k25: 'Delete policy',
   },
   common: {
+    input: 'Input',
     colFilePath: 'File path',
     totalN: '{n} total',
     saved: 'Saved',

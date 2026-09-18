@@ -183,7 +183,12 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
 /* ── 브라우저 ────────────────────────────────────────────────────────────── */
-const browser = await playwright.chromium.launch();
+// Match the browser override used by the runtime verification scripts.
+const browser = await playwright.chromium.launch({
+  headless: true,
+  ...(process.env.AIDOT_BROWSER_EXECUTABLE ? { executablePath: process.env.AIDOT_BROWSER_EXECUTABLE } : {}),
+  args: process.env.AIDOT_BROWSER_ARGS ? JSON.parse(process.env.AIDOT_BROWSER_ARGS) : [],
+});
 const results = [];
 
 for (const c of ready) {

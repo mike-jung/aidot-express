@@ -222,6 +222,8 @@ const dotenvOverrides = {
 
   paths: {
     workspace: process.env.APP_WORKSPACE,
+    migrationsDir: process.env.DB_MIGRATIONS_DIR,
+    publicDir: process.env.PUBLIC_DIR,
   },
 
   server: {

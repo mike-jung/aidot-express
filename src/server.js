@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { uploadHeaders } from './core/uploadHeaders.js';
+import { configureUploads } from './core/uploads.js';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import path from 'node:path';
@@ -279,6 +280,7 @@ export async function createServer() {
   const adminDistDir = path.resolve(projectRoot, 'admin-client', 'dist');
   const hasAdminDist = fs.existsSync(path.join(adminDistDir, 'index.html'));
   const publicDir = path.resolve(projectRoot, config.paths.publicDir);
+  configureUploads({ publicDirectory: publicDir });
 
   if (hasAdminDist) {
     // admin-client/dist 를 루트 '/' 에 바인드
@@ -400,7 +402,8 @@ export async function createServer() {
     try {
       const { runMigrations } = await import('./database/migrationRunner.js');
       const r = await runMigrations({
-        dirs: ['src/database/migrations', 'lib/admin/database/migrations'],
+        dirs: ['src/database/migrations', 'lib/admin/database/migrations',
+          ...(config.paths.migrationsDir ? [config.paths.migrationsDir] : [])],
         projectRoot,
       });
       // ★ v1.7.3: non-blocking 으로 표시된 샘플 파일은 실패해도 체인을 끊지 않는다.

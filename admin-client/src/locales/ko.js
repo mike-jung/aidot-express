@@ -640,6 +640,7 @@ export default {
     k25: '정책 삭제',
   },
   common: {
+    input: '입력',
     colFilePath: '파일 경로',
     totalN: '총 {n}개',
     saved: '저장됨',
