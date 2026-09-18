@@ -68,7 +68,7 @@ export function extractResourceName(path) {
  */
 export function assembleSfc({ imports = [], setup = '', template = '', style = '' } = {}) {
   const importBlock = imports.filter(Boolean).join('\n');
-  const scriptBody = [importBlock, '', setup].filter(Boolean).join('\n');
+  const scriptBody = [importBlock, setup].filter(Boolean).join('\n\n');
   const out = [];
   out.push('<script setup>');
   out.push(scriptBody);

@@ -85,7 +85,7 @@ const valueColorClass = computed(() => 'text-' + (props.color || 'primary'));
 /* ════════════════════════════ ListWidget ════════════════════════════ */
 
 const LIST_WIDGET = (S) => `<script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -130,8 +130,15 @@ watch(() => props.rows, () => {
   if (!props.realtime) return;
   justUpdated.value = true;
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => { justUpdated.value = false; }, 1200);
-}, { deep: false });
+  flashTimer = setTimeout(() => {
+    justUpdated.value = false;
+  }, 1200);
+});
+
+// 화면이 없어지면 표시용 타이머도 해제한다.
+onBeforeUnmount(() => {
+  clearTimeout(flashTimer);
+});
 </script>
 
 <template>
@@ -315,8 +322,9 @@ const props = defineProps({
   defaultPerPage: { type: Number, default: 10 },
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
+  rowClickable: { type: Boolean, default: false },
 });
-const emit = defineEmits(['change-page']);
+const emit = defineEmits(['change-page', 'row-click']);
 
 const effectiveColumns = computed(() => {
   if (props.columns && props.columns.length) return props.columns;
@@ -333,18 +341,35 @@ const pageWindow = computed(() => {
   const size = 10;
   let start = Math.max(1, props.page - Math.floor(size / 2));
   let end = start + size - 1;
-  if (end > tp) { end = tp; start = Math.max(1, end - size + 1); }
+  if (end > tp) {
+    end = tp;
+    start = Math.max(1, end - size + 1);
+  }
+
   const arr = [];
-  for (let i = start; i <= end; i++) arr.push(i);
+  for (let i = start; i <= end; i++) {
+    arr.push(i);
+  }
+
   return arr;
 });
 
 const hasPrev = computed(() => props.page > 1);
 const hasNext = computed(() => props.page < props.totalPages);
 
-function go(p) {
-  if (p < 1 || p > props.totalPages || p === props.page) return;
-  emit('change-page', p);
+function go(page) {
+  if (page < 1 || page > props.totalPages || page === props.page) {
+    return;
+  }
+
+  emit('change-page', page);
+}
+
+// 일반 목록과 페이지 목록 모두 같은 행 선택 이벤트를 제공한다.
+function selectRow(row) {
+  if (props.rowClickable) {
+    emit('row-click', row);
+  }
 }
 
 const formatCell = (v) => {
@@ -374,7 +399,12 @@ const formatCell = (v) => {
             <tr><th v-for="c in effectiveColumns" :key="c.name" class="fw-semibold">{{ c.label }}</th></tr>
           </thead>
           <tbody>
-            <tr v-for="(row, i) in rows" :key="i">
+            <tr v-for="(row, i) in rows" :key="row.id ?? i"
+                :class="{ 'row-clickable': rowClickable }"
+                :tabindex="rowClickable ? 0 : undefined"
+                :role="rowClickable ? 'button' : undefined"
+                @click="selectRow(row)"
+                @keyup.enter="selectRow(row)">
               <td v-for="c in effectiveColumns" :key="c.name">{{ formatCell(row[c.name]) }}</td>
             </tr>
           </tbody>
@@ -393,6 +423,11 @@ const formatCell = (v) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.row-clickable { cursor: pointer; }
+.row-clickable:focus-visible { outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: -2px; }
+</style>
 `;
 
 /* ════════════════════════════ QueryFormWidget (Phase 33/patch-12) ════════════════════════════ */
@@ -429,9 +464,16 @@ function onSubmit() {
   const out = {};
   for (const f of (props.fields || [])) {
     let v = values[f.name];
-    if (v === '' || v == null) continue;
-    if (f.type === 'number') v = Number(v);
-    if (f.type === 'boolean') v = v === true || v === 'true';
+    if (v === '' || v == null) {
+      continue;
+    }
+
+    if (f.type === 'number') {
+      v = Number(v);
+    } else if (f.type === 'boolean') {
+      v = v === true || v === 'true';
+    }
+
     out[f.name] = v;
   }
   emit('submit', out);
@@ -495,7 +537,11 @@ const emit = defineEmits(['success']);
 const titleId = useId();
 let closeTimer = null;
 let disposed = false;
-onBeforeUnmount(() => { disposed = true; clearTimeout(closeTimer); });
+// 응답을 기다리는 동안 화면을 떠나면 닫힌 대화상자를 다시 갱신하지 않는다.
+onBeforeUnmount(() => {
+  disposed = true;
+  clearTimeout(closeTimer);
+});
 
 const open = ref(false);
 const values = reactive({});
@@ -510,11 +556,24 @@ function reset() {
   error.value = '';
   success.value = '';
 }
-function openDialog() { clearTimeout(closeTimer); reset(); open.value = true; }
-function closeDialog() { if (!submitting.value) open.value = false; }
+
+function openDialog() {
+  clearTimeout(closeTimer);
+  reset();
+  open.value = true;
+}
+
+function closeDialog() {
+  if (!submitting.value) {
+    open.value = false;
+  }
+}
 
 async function doSubmit() {
-  if (submitting.value || success.value) return;
+  if (submitting.value || success.value) {
+    return;
+  }
+
   error.value = '';
   for (const f of (props.fields || [])) {
     if (f.required && (values[f.name] == null || values[f.name] === '')) {
@@ -522,24 +581,43 @@ async function doSubmit() {
       return;
     }
   }
-  if (props.confirmBeforeSubmit && !confirm('${S.confirmProceed}')) return;
+  if (props.confirmBeforeSubmit && !confirm('${S.confirmProceed}')) {
+    return;
+  }
+
   submitting.value = true;
   try {
     const out = {};
     for (const f of (props.fields || [])) {
       let v = values[f.name];
-      if (v === '' || v == null) continue;
-      if (f.type === 'number') v = Number(v);
-      if (f.type === 'boolean') v = v === true || v === 'true';
+      if (v === '' || v == null) {
+        continue;
+      }
+
+      if (f.type === 'number') {
+        v = Number(v);
+      } else if (f.type === 'boolean') {
+        v = v === true || v === 'true';
+      }
+
       out[f.name] = v;
     }
-    // Vue emit() does not return the parent's Promise; await the action prop.
-    if (!props.submitAction) throw new Error('API 연결을 설정해 주세요.');
+    // emit()은 비동기 결과를 반환하지 않으므로 전달받은 저장 함수를 직접 기다린다.
+    if (!props.submitAction) {
+      throw new Error('API 연결을 설정해 주세요.');
+    }
+
     await props.submitAction(out);
-    if (disposed) return;
+
+    if (disposed) {
+      return;
+    }
+
     success.value = '${S.done}';
     emit('success');
-    closeTimer = setTimeout(() => { open.value = false; }, 600);
+    closeTimer = setTimeout(() => {
+      open.value = false;
+    }, 600);
   } catch (e) {
     error.value = errorMessage(e);
   } finally {

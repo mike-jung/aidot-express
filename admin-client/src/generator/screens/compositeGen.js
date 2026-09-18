@@ -73,9 +73,20 @@ export function genCompositeScreen(spec, { resourceCollector = new Map(), screen
      템플릿이 onRowClick_x 를 참조하는데 script 에 함수가 없는 코드가 나갔다(빌드 실패). */
   ctx.rowClick = rowClickHandlers(spec, screens);
 
-  const imports = buildImports(ctx);
-  const setup = buildSetup(ctx);
+  ctx.lifecycle = buildLifecyclePlan(ctx);
+  ctx.formFields = new Map();
+  for (const widget of (spec.rows || []).flatMap(row => row.widgets || [])) {
+    if (['formDialog', 'queryForm'].includes(widget.kind)) {
+      ctx.formFields.set(widget.id, {
+        name: `formFields${ctx.formFields.size + 1}`,
+        fields: widget.config?.fields || [],
+      });
+    }
+  }
+
   const template = buildTemplate(ctx);
+  const setup = buildSetup(ctx, template);
+  const imports = buildImports(ctx, setup, template);
 
   const name = viewName(spec);
   return {
@@ -321,46 +332,118 @@ function buildContext(spec, resourceCollector) {
 
 /* ════════════════════════════ imports ════════════════════════════ */
 
-function buildImports(ctx) {
+function buildImports(ctx, setup, template) {
   const imports = [];
-  imports.push(`import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';`);
-  if (ctx.rowClick?.needsRouter) imports.push(`import { useRouter } from 'vue-router';`);
-  if (ctx.usedResources.size > 0) {
+  const vueNames = ['ref', 'computed', 'watch', 'onMounted', 'onBeforeUnmount']
+    .filter(name => new RegExp(`\\b${name}\\s*\\(`).test(setup));
+
+  if (vueNames.length) {
+    imports.push(`import { ${vueNames.join(', ')} } from 'vue';`);
+  }
+  if (ctx.rowClick?.needsRouter) {
+    imports.push(`import { useRouter } from 'vue-router';`);
+  }
+  if (setup.includes('storeToRefs(')) {
     imports.push(`import { storeToRefs } from 'pinia';`);
-    for (const [c, info] of ctx.usedResources) {
-      imports.push(`import { use${info.Pascal}Store } from '@/stores/${c}Store';`);
+  }
+
+  for (const [key, info] of ctx.usedResources) {
+    imports.push(`import { use${info.Pascal}Store } from '@/stores/${key}Store';`);
+  }
+
+  const widgets = [
+    'StatWidget', 'ListWidget', 'ListPagedWidget', 'DetailWidget',
+    'TextWidget', 'MarkdownWidget', 'QueryFormWidget', 'FormDialogWidget',
+  ];
+
+  for (const name of widgets) {
+    if (new RegExp(`<${name}\\s`).test(template)) {
+      imports.push(`import ${name} from '@/components/widgets/${name}.vue';`);
     }
   }
-  // widget 컴포넌트들 import (사용자가 프로젝트에 widget SFC 들을 가지고 있다고 가정)
-  imports.push(``);
-  imports.push(`import StatWidget from '@/components/widgets/StatWidget.vue';`);
-  imports.push(`import ListWidget from '@/components/widgets/ListWidget.vue';`);
-  // Phase 33 (patch-12): 신규 widget SFCs
-  imports.push(`import ListPagedWidget from '@/components/widgets/ListPagedWidget.vue';`);
-  imports.push(`import DetailWidget from '@/components/widgets/DetailWidget.vue';`);
-  imports.push(`import TextWidget from '@/components/widgets/TextWidget.vue';`);
-  imports.push(`import MarkdownWidget from '@/components/widgets/MarkdownWidget.vue';`);
-  imports.push(`import QueryFormWidget from '@/components/widgets/QueryFormWidget.vue';`);
-  imports.push(`import FormDialogWidget from '@/components/widgets/FormDialogWidget.vue';`);
+
   return imports;
+}
+
+// 어느 API를 자동으로 읽을지 먼저 정해 템플릿과 생명주기 코드가 같은 계획을 쓴다.
+function buildLifecyclePlan(ctx) {
+  const screenParams = ctx.spec.params?.length ? ctx.spec.params : paramsFromPath(ctx.spec.path);
+  const widgetsFor = key => (ctx.spec.rows || [])
+    .flatMap(row => row.widgets || [])
+    .filter(widget => ctx.widgetBindings.get(widget.id)?.storePrefix === key);
+  const usesParam = info => screenParams.some(param =>
+    new RegExp(`(\\{${param.name}\\}|/:${param.name}(?![A-Za-z0-9_]))`).test(info.endpointPath || ''),
+  );
+  const readResources = [...ctx.usedResources]
+    .filter(([key]) => widgetsFor(key).some(widget => widget.kind !== 'formDialog'));
+  const autoResources = readResources.filter(([key, info]) =>
+    ['GET', 'HEAD'].includes(info.method.toUpperCase())
+    && widgetsFor(key).some(widget => widget.kind !== 'queryForm')
+    && (!/[{:]/.test(info.endpointPath) || usesParam(info)),
+  );
+  const realtimeKeys = readResources
+    .filter(([, info]) => info.realtime && ['GET', 'HEAD'].includes(info.method.toUpperCase()))
+    .map(([key]) => key);
+  const hasForm = (ctx.spec.rows || []).some(row =>
+    (row.widgets || []).some(widget => widget.kind === 'formDialog'),
+  );
+
+  return {
+    screenParams,
+    widgetsFor,
+    usesParam,
+    autoResources,
+    realtimeKeys,
+    cleanupKeys: readResources.map(([key]) => key),
+    refreshAfterSave: hasForm && autoResources.length > 0,
+  };
 }
 
 /* ════════════════════════════ setup 본문 ════════════════════════════ */
 
-function buildSetup(ctx) {
+function buildSetup(ctx, template) {
   const lines = [];
-  if (ctx.rowClick?.needsRouter) lines.push('const router = useRouter();');
+  if (ctx.rowClick?.needsRouter) lines.push('const router = useRouter();', '');
 
-  // 각 resource 의 store 인스턴스 + storeToRefs
-  for (const [c, info] of ctx.usedResources) {
-    lines.push(`const ${c}Store = use${info.Pascal}Store();`);
-    lines.push(`const { rows: ${c}Rows, currentItem: ${c}CurrentItem, loading: ${c}Loading, error: ${c}Error, total: ${c}Total, page: ${c}Page, perPage: ${c}PerPage, totalPages: ${c}TotalPages } = storeToRefs(${c}Store);`);
+  const customCode = [
+    ...(ctx.spec.customFns || []).map(fn => fn.body),
+    ...(ctx.spec.customVars || []).map(variable => variable.expression),
+    ...ctx.computedDecls,
+  ].join('\n');
+  const usedCode = template + '\n' + customCode;
+  const stateNames = ['rows', 'currentItem', 'loading', 'error', 'total', 'page', 'perPage', 'totalPages'];
+
+  if (ctx.usedResources.size) {
+    lines.push('// 화면에 필요한 상태만 Store에서 꺼낸다. storeToRefs는 반응성을 유지한다.');
+  }
+
+  for (const [key, info] of ctx.usedResources) {
+    lines.push(`const ${key}Store = use${info.Pascal}Store();`);
+    const fields = stateNames.filter(name =>
+      new RegExp(`\\b${key}${pascal(name)}\\b`).test(usedCode),
+    );
+
+    if (fields.length) {
+      lines.push('const {');
+      for (const name of fields) {
+        lines.push(`  ${name}: ${key}${pascal(name)},`);
+      }
+      lines.push(`} = storeToRefs(${key}Store);`);
+    }
+
+    lines.push('');
+  }
+
+  for (const { name, fields } of ctx.formFields.values()) {
+    lines.push('// 폼의 필드 이름은 서버가 받는 파라미터 이름과 맞춘다.');
+    const value = JSON.stringify(fields, null, 2).replace(/</g, '\\u003c');
+    lines.push(`const ${name} = ${value};`, '');
   }
 
   // customFns
   if (ctx.spec.customFns?.length) {
     lines.push('');
-    lines.push('// User-defined functions');
+    lines.push('// 디자이너에서 추가한 사용자 함수');
     for (const fn of ctx.spec.customFns) {
       const params = (fn.params || []).join(', ');
       const body = (fn.body || 'return null;').split('\n').map((l) => '  ' + l).join('\n');
@@ -373,7 +456,7 @@ function buildSetup(ctx) {
   // customVars
   if (ctx.spec.customVars?.length) {
     lines.push('');
-    lines.push('// User-defined computed vars');
+    lines.push('// 다른 상태에서 계산한 화면 값');
     for (const v of ctx.spec.customVars) {
       lines.push(`const ${v.name} = computed(() => (${v.expression || 'null'}));`);
     }
@@ -382,54 +465,76 @@ function buildSetup(ctx) {
   // widget-level computeds (storeCompute)
   if (ctx.computedDecls.length) {
     lines.push('');
-    lines.push('// Widget-level computeds (storeCompute sources)');
+    lines.push('// 위젯에서 사용하는 계산 값');
     for (const d of ctx.computedDecls) lines.push(d);
   }
 
-  /* ★ v1.11.7 — 이 화면이 파라미터를 받으면(예: /books/:id) 라우트 params 가 props 로 온다.
-       그 파라미터를 쓰는 API(/api/books/:id · {id})는 fetchList 가 아니라 fetchOne({ id }) 로 읽어야
-       DetailWidget 의 currentItem 이 채워진다. 예전에는 상세 화면이 늘 비어 있었다. */
-  const screenParams = Array.isArray(ctx.spec.params) && ctx.spec.params.length ? ctx.spec.params : paramsFromPath(ctx.spec.path);
-  if (screenParams.length) {
-    lines.push('');
-    lines.push(`const props = defineProps({ ${screenParams.map((prm) => `${prm.name}: { type: [String, Number], default: null }`).join(', ')} });`);
-  }
-  const usesParam = (info) => screenParams.some((prm) => new RegExp(`(\\{${prm.name}\\}|/:${prm.name}(?![A-Za-z0-9_]))`).test(String(info.endpointPath || '')));
+  const {
+    screenParams, widgetsFor, usesParam, autoResources,
+    realtimeKeys, cleanupKeys, refreshAfterSave,
+  } = ctx.lifecycle;
+  const hasParamRead = autoResources.some(([, info]) => usesParam(info));
 
-  // Only read endpoints load automatically. Writes run exclusively on form submission.
-  const readResources = [...ctx.usedResources].filter(([, info]) => ['GET', 'HEAD'].includes(info.method.toUpperCase()));
-  const widgetsFor = key => (ctx.spec.rows || []).flatMap(row => row.widgets || []).filter(widget => ctx.widgetBindings.get(widget.id)?.storePrefix === key);
-  const autoResources = readResources.filter(([key, info]) => widgetsFor(key).some(widget => !['formDialog', 'queryForm'].includes(widget.kind))
-    && (!/[{:]/.test(info.endpointPath) || usesParam(info)));
+  if (screenParams.length && (hasParamRead || /\bprops\b/.test(usedCode))) {
+    lines.push('// router의 props: true 설정으로 경로 파라미터를 전달받는다.');
+    lines.push('const props = defineProps({');
+    for (const param of screenParams) {
+      lines.push(`  ${param.name}: {`);
+      lines.push('    type: [String, Number],');
+      lines.push('    default: null,');
+      lines.push('  },');
+    }
+    lines.push('});', '');
+  }
+
   const mounted = [];
-  for (const [c, info] of autoResources) {
+  for (const [key, info] of autoResources) {
     if (screenParams.length && usesParam(info)) {
-      const args = screenParams.map(prm => `${prm.name}: props.${prm.name}`).join(', ');
-      lines.push(`watch(() => [${screenParams.map(prm => `props.${prm.name}`).join(', ')}], () => {`);
-      lines.push(`  void ${c}Store.fetchOne({ ${args} });`);
-      lines.push('}, { immediate: true });');
+      const args = screenParams.map(param => `${param.name}: props.${param.name}`).join(', ');
+      lines.push('// 같은 상세 화면에서 id만 바뀌는 경우에도 다시 조회한다.');
+      lines.push('watch(');
+      lines.push(`  () => [${screenParams.map(param => `props.${param.name}`).join(', ')}],`);
+      lines.push('  () => {');
+      lines.push(`    ${key}Store.fetchOne({ ${args} });`);
+      lines.push('  },');
+      lines.push('  { immediate: true },');
+      lines.push(');', '');
     } else {
-      const onlyDetail = widgetsFor(c).every(widget => ['detail', 'queryForm'].includes(widget.kind));
-      const paged = widgetsFor(c).find(widget => widget.kind === 'listPaged');
+      const onlyDetail = widgetsFor(key).every(widget => ['detail', 'queryForm'].includes(widget.kind));
+      const paged = widgetsFor(key).find(widget => widget.kind === 'listPaged');
       const initial = paged ? `{ perPage: ${Math.max(1, Number(paged.config?.perPage) || 10)} }` : '';
-      mounted.push(`  void ${c}Store.${onlyDetail ? 'fetchOne' : 'fetchList'}(${initial});`);
+      mounted.push(`  ${key}Store.${onlyDetail ? 'fetchOne' : 'fetchList'}(${initial});`);
     }
   }
-  const realtimeKeys = readResources.filter(([, info]) => info.realtime).map(([c]) => c);
-  for (const c of realtimeKeys) mounted.push(`  ${c}Store.subscribeRealtime();`);
-  if (mounted.length) lines.push('onMounted(() => {', ...mounted, '});');
-  if (ctx.usedResources.size) {
-    lines.push('onBeforeUnmount(() => {');
-    for (const [c] of ctx.usedResources) lines.push(`  ${c}Store.cancelReads();`);
-    for (const c of realtimeKeys) lines.push(`  ${c}Store.unsubscribeRealtime();`);
-    lines.push('});');
+  for (const key of realtimeKeys) {
+    mounted.push(`  ${key}Store.subscribeRealtime();`);
   }
-  lines.push('async function refreshData() {');
-  lines.push(`  await Promise.all([${autoResources.map(([c]) => `${c}Store.refresh()`).join(', ')}]);`);
-  lines.push('}');
+  if (mounted.length) {
+    lines.push('// 화면이 열리면 조회한다. 조회 오류는 Store의 error 상태에 표시된다.');
+    lines.push('onMounted(() => {', ...mounted, '});', '');
+  }
+  if (cleanupKeys.length) {
+    lines.push('// 화면을 떠나면 진행 중인 조회와 실시간 구독을 정리한다.');
+    lines.push('onBeforeUnmount(() => {');
+    for (const key of cleanupKeys) lines.push(`  ${key}Store.cancelReads();`);
+    for (const key of realtimeKeys) lines.push(`  ${key}Store.unsubscribeRealtime();`);
+    lines.push('});', '');
+  }
+  if (refreshAfterSave) {
+    lines.push('// 저장이 성공한 뒤 현재 화면의 데이터를 갱신한다.');
+    lines.push('function refreshData() {');
+    if (autoResources.length === 1) {
+      lines.push(`  return ${autoResources[0][0]}Store.refresh();`);
+    } else {
+      lines.push('  return Promise.all([');
+      for (const [key] of autoResources) lines.push(`    ${key}Store.refresh(),`);
+      lines.push('  ]);');
+    }
+    lines.push('}', '');
+  }
 
   if (ctx.rowClick?.lines?.length) lines.push(...ctx.rowClick.lines);
-  return lines.join('\n');
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /* ════════════════════════════ template ════════════════════════════ */
@@ -475,7 +580,11 @@ function buildTemplate(ctx) {
         || { primary: 'null', rowsExpr: '[]', loading: 'false', error: "''" };
       const widgetStyle = widgetStyleAttr(widget);
       lines.push(`    <div class="col-md-${width}"${widgetStyle}>`);
-      lines.push(`      ${widgetMarkup(widget, binding, ctx.usedResources.keys().next().value || null)}`);
+      const markup = widgetMarkup(
+        widget, binding, ctx.usedResources.keys().next().value || null,
+        ctx.lifecycle.refreshAfterSave, ctx.formFields.get(widget.id)?.name,
+      );
+      lines.push(...formatWidgetTag(markup).split('\n').map(line => '      ' + line));
       lines.push(`    </div>`);
     }
     lines.push('  </div>');
@@ -483,6 +592,15 @@ function buildTemplate(ctx) {
 
   lines.push('</div>');
   return lines.join('\n');
+}
+
+// 생성기가 만든 컴포넌트 태그는 속성을 한 줄씩 배치한다.
+function formatWidgetTag(markup) {
+  const tag = /^<([A-Z][A-Za-z0-9]*)\s+([\s\S]*?)\s*\/>$/.exec(markup);
+  if (!tag || markup.length < 100) return markup;
+
+  const attributes = tag[2].match(/[^\s=]+(?:=(?:"[^"]*"|'[^']*'))?/g) || [];
+  return [`<${tag[1]}`, ...attributes.map(attribute => '  ' + attribute), '/>'].join('\n');
 }
 
 function widgetStyleAttr(widget) {
@@ -495,7 +613,7 @@ function widgetStyleAttr(widget) {
   return parts.length ? ` style="${parts.join('; ')}"` : '';
 }
 
-function widgetMarkup(widget, binding, fallbackPrefix = null) {
+function widgetMarkup(widget, binding, fallbackPrefix = null, refreshAfterSave = false, fieldsName = null) {
   const title = escapeAttr(widget.title || '');
   const cfg = widget.config || {};
   // Phase 24: 신규 widget kind (chart/progress/timeline/form/button/search/image) 는
@@ -549,7 +667,7 @@ function widgetMarkup(widget, binding, fallbackPrefix = null) {
       //   binding.rowsExpr 이 없으므로 store 접두사는 widget 의 targetWidgetId 로 추론 어려움.
       //   대신, widget.source 에서 추출한 resource 를 사용.
       const storePrefix = binding.storePrefix || fallbackPrefix;
-      const fieldsJson = escapeAttr(JSON.stringify(cfg.fields || []));
+      const fieldsJson = fieldsName || escapeAttr(JSON.stringify(cfg.fields || []));
       const submitLabel = escapeAttr(cfg.submitLabel || '조회');
       const endpointHint = cfg.endpointHint ? ` endpoint-hint="${escapeAttr(cfg.endpointHint)}"` : '';
       /* store 가 없으면 제출 핸들러를 만들지 않는다 — 죽는 코드보다 조용한 편이 낫다 */
@@ -559,13 +677,13 @@ function widgetMarkup(widget, binding, fallbackPrefix = null) {
     case 'formDialog': {
       // Phase 33 (patch-12): 버튼+모달+폼. 제출 시 store.submitForm(params) → 성공 후 fetchList 재호출.
       const storePrefix = binding.storePrefix || fallbackPrefix;
-      const fieldsJson = escapeAttr(JSON.stringify(cfg.fields || []));
+      const fieldsJson = fieldsName || escapeAttr(JSON.stringify(cfg.fields || []));
       const btnLabel = escapeAttr(cfg.buttonLabel || '실행');
       const btnVariant = escapeAttr(cfg.buttonVariant || 'primary');
       const dlgTitle = escapeAttr(cfg.dialogTitle || widget.title || btnLabel);
       const confirm = !!cfg.confirmBeforeSubmit;
       const method = escapeAttr(widget.source?.method || 'POST');
-      return `<FormDialogWidget title="${title}" button-label="${btnLabel}" button-variant="${btnVariant}" dialog-title="${dlgTitle}" :fields="${fieldsJson}" :confirm-before-submit="${confirm}" method="${method}"${storePrefix ? ` :submit-action="(params) => ${storePrefix}Store.submitForm('${method}', params)"` : ''} @success="refreshData" />`;
+      return `<FormDialogWidget title="${title}" button-label="${btnLabel}" button-variant="${btnVariant}" dialog-title="${dlgTitle}" :fields="${fieldsJson}" :confirm-before-submit="${confirm}" method="${method}"${storePrefix ? ` :submit-action="(params) => ${storePrefix}Store.submitForm('${method}', params)"` : ''}${refreshAfterSave ? ' @success="refreshData"' : ''} />`;
     }
     case 'markdown': {
       // button / image / kanban placeholder 를 markdown 으로 렌더할 때 약간의 힌트 추가

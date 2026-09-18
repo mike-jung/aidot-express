@@ -50,10 +50,23 @@ export default defineConfig(({ mode }) => {
   return {
     base: env.VITE_APP_BASE || '/',
     plugins: [vue()],
-    resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     server: {
-      host: '127.0.0.1', port: 5173, strictPort: true,
-      proxy: { [proxyPath]: { target, changeOrigin: true, secure: true } },
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
+      // 개발 중 API 요청을 서버로 전달한다. HTTPS 인증서 검증은 유지한다.
+      proxy: {
+        [proxyPath]: {
+          target,
+          changeOrigin: true,
+          secure: true,
+        },
+      },
     },
   };
 });
@@ -67,26 +80,36 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import './assets/main.css';
+
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import { useAuthStore } from '@/stores/auth';
 
+// 모든 화면이 같은 Pinia와 Router 인스턴스를 사용한다.
 const app = createApp(App);
 const pinia = createPinia();
+
 app.use(pinia);
 app.use(router);
 
 async function start() {
-  if (import.meta.env.VITE_AUTH_ENABLED === 'true') await useAuthStore(pinia).bootstrap();
+  // 인증을 사용하는 프로젝트는 쿠키로 로그인 상태를 먼저 복원한다.
+  if (import.meta.env.VITE_AUTH_ENABLED === 'true') {
+    await useAuthStore(pinia).bootstrap();
+  }
+
   await router.isReady();
   app.mount('#app');
 }
-start(); // Font loading must not delay the application.
+
+start();
 `),
     file('src/App.vue', `<template>
-  <AppLayout><RouterView /></AppLayout>
+  <AppLayout>
+    <RouterView />
+  </AppLayout>
 </template>
 
 <script setup>
@@ -150,14 +173,26 @@ function environment(project) {
 }
 
 export function genRouterIndex(composites = []) {
-  const routes = composites.map(spec => `    { path: ${JSON.stringify(routePathFor(spec))}, name: ${JSON.stringify(pascal(viewName(spec)))}, props: true, component: () => import('../views/${viewName(spec)}.vue') },`);
+  const routes = composites.map(spec => `    {
+      path: ${JSON.stringify(routePathFor(spec))},
+      name: ${JSON.stringify(pascal(viewName(spec)))},
+      props: true,
+      component: () => import('../views/${viewName(spec)}.vue'),
+    },`);
+
   if (!composites.some(spec => routePathFor(spec) === '/')) {
     const firstStatic = composites.find(spec => !routePathFor(spec).includes(':'));
-    routes.unshift(firstStatic ? `    { path: '/', redirect: ${JSON.stringify(routePathFor(firstStatic))} },`
-      : `    { path: '/', name: 'Welcome', component: () => import('../views/WelcomeView.vue') },`);
+    routes.unshift(firstStatic
+      ? `    { path: '/', redirect: ${JSON.stringify(routePathFor(firstStatic))} },`
+      : `    {
+      path: '/',
+      name: 'Welcome',
+      component: () => import('../views/WelcomeView.vue'),
+    },`);
   }
   return file('src/router/index.js', `import { createRouter, createWebHistory } from 'vue-router';
 
+// 화면은 처음 이동할 때 불러오고, 경로 파라미터는 props로 전달한다.
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -204,6 +239,13 @@ aidot-express envelope. /api is not duplicated when endpoint paths already have 
 Metronic selection: copy your licensed public/assets from WT-frontend into this
 project before running it. No commercial theme binaries are redistributed here.
 The supplied chart/date/icon packages remain available for your lesson code.
+
+Reading the code: View → Store → api/axios.js → server.
+The Axios module shares server settings, authentication and response helpers.
+Stores own data/loading/error state; views bind that state and call actions.
+A one-off request can also import the same api instance directly in a view.
+Read actions handle errors in the store, so lifecycle calls need no void prefix.
+Write actions reject on failure, so forms must await them before closing.
 ` : `# ${project.name || '생성된 프로젝트'}
 
 WT-frontend의 강의용 기본 구조를 유지한 Vue3 + Vite 프로젝트입니다.
@@ -235,6 +277,13 @@ data를 꺼냅니다. /api가 중복되는 경로도 공통 모듈에서 처리�
 Metronic을 선택했다면 사용 권한이 있는 WT-frontend의 public/assets를
 이 프로젝트의 public/assets로 복사하세요. 상용 테마 파일은 포함하지 않습니다.
 참조 프로젝트의 차트·날짜·아이콘 패키지도 강의 코드에서 사용할 수 있습니다.
+
+코드를 읽는 순서: View → Store → api/axios.js → 서버.
+공통 Axios 모듈은 서버 주소·인증·응답 처리를, Store는 데이터·로딩·오류 상태를,
+View는 화면 표시와 사용자 동작을 담당합니다. 한 화면에서만 쓰는 일회성 요청은
+View에서도 같은 api 인스턴스를 가져와 호출할 수 있습니다.
+조회 함수는 Store에서 오류를 처리하므로 생명주기 호출에 void가 필요하지 않습니다.
+저장 함수는 실패를 호출자에게 전달하므로 폼에서는 await로 성공 여부를 확인합니다.
 `;
   return file('README.md', text);
 }
