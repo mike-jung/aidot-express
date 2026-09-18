@@ -17,7 +17,7 @@ import { genScaffold, genRouterIndex } from '../layouts/scaffoldGen.js';
 import { genLayout } from '../layouts/layoutGen.js';
 import { genWidgetSfcs } from '../widget-templates/widgetSfcTemplates.js';
 import { genApiClient, genAuthStore } from './commonGen.js';
-import { genCompositeScreen, genCompositeRouterModule } from './compositeGen.js';
+import { genCompositeScreen, viewName, collectEndpointResources } from './compositeGen.js';
 import { genAllResourceStores } from './resourceStoreGen.js';
 
 /**
@@ -44,14 +44,21 @@ export function generateProject(project, lang) {
   files.push(genAuthStore());
 
   // 5) composite screens
-  const composites = (project.screens || []).filter((s) => s.kind === 'composite');
+  const names = new Set(['WelcomeView']);
+  const composites = (project.screens || []).filter(s => s.kind === 'composite').map(spec => {
+    const base = viewName(spec);
+    let generatedViewName = base;
+    let suffix = 2;
+    while (names.has(generatedViewName)) generatedViewName = base.replace(/View$/, '') + suffix++ + 'View';
+    names.add(generatedViewName);
+    return { ...spec, generatedViewName };
+  });
+  collectEndpointResources(composites, resourceCollector);
   for (const spec of composites) {
     files.push(genCompositeScreen(spec, { resourceCollector, screens: composites }));   // ★ v1.11.7 화면 이동 핸들러에 대상 화면 목록
   }
 
-  // 6) composite router module
-  const routerModule = genCompositeRouterModule(composites);
-  if (routerModule) files.push(routerModule);
+  // All routes stay in src/router/index.js, matching the teaching project.
 
   // 7) 루트 router
   files.push(genRouterIndex(composites));

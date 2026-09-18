@@ -1,6 +1,6 @@
 {
   "name": "aidot-express",
-  "version": "1.45.4",
+  "version": "1.45.5",
   "description": "A Spring Boot style Node.js and Express web server framework",
   "type": "module",
   "engines": {

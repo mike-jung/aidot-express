@@ -58,7 +58,7 @@ export function genLayout(layout, cssFramework = 'bootstrap') {
     files.push(genAppAuxPanel(isMetronic));
   }
 
-  return files;
+  return files.map(file => ({ ...file, path: file.path.replace('src/layouts/components/', 'src/components/').replace('src/layouts/', 'src/components/'), content: file.content.replaceAll("from './components/", "from './").replaceAll('<RouterView />', '<slot />') }));
 }
 
 /* ════════════════════════════ AppLayout.vue ════════════════════════════ */
@@ -590,7 +590,7 @@ import { RouterLink } from 'vue-router';
        data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
     <div class="app-sidebar-logo px-6 py-4" id="kt_app_sidebar_logo">
       <RouterLink to="/" class="d-flex align-items-center">
-        <span class="fs-3 fw-bold text-white">${escapeAttr(sidebar.brand || 'App')}</span>
+        <span class="fs-3 fw-bold ${dark ? 'text-white' : 'text-body'}">${escapeAttr(sidebar.brand || 'App')}</span>
       </RouterLink>
     </div>
     <div class="app-sidebar-menu overflow-hidden flex-column-fluid">

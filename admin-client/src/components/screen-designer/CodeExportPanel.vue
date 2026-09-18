@@ -50,6 +50,19 @@ const files = computed(() => fileEdits.applyTo(props.project?.id, rawFiles.value
 
 // 편집된 경로 Set (뱃지 용)
 const editedPaths = computed(() => fileEdits.listEditedPaths(props.project?.id));
+const orphanedPaths = computed(() => {
+  const generated = new Set(rawFiles.value.map(file => file.path));
+  return [...editedPaths.value].filter(path => !generated.has(path));
+});
+function downloadEditBackup() {
+  const data = { projectId: props.project?.id, edits: fileEdits.forProject(props.project?.id) };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'screen-designer-edited-files.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 /* ─── 파일 트리 ─── */
 const tree = computed(() => buildTree(files.value));
@@ -89,7 +102,7 @@ function sortNode(node) {
 
 /* ─── 선택 + 확장 ─── */
 const selected = ref(null);
-const expanded = ref(new Set(['', 'src', 'src/layouts', 'src/views', 'src/stores', 'src/components', 'src/api', 'src/router']));
+const expanded = ref(new Set(['', 'src', 'src/assets', 'src/views', 'src/stores', 'src/components', 'src/api', 'src/router']));
 
 function toggleDir(path) {
   if (expanded.value.has(path)) expanded.value.delete(path);
@@ -226,6 +239,10 @@ const totalBytes = computed(() =>
 <template>
   <div class="code-export-panel">
 
+    <div v-if="orphanedPaths.length" class="alert alert-warning small">
+      {{ locale.startsWith('en') ? 'Some edited file paths changed. Back up your edits and move them to the new files.' : '구조 변경으로 경로가 달라진 편집 파일이 있습니다. 편집본을 백업한 뒤 새 파일에 옮겨 주세요.' }}
+      <div v-for="path in orphanedPaths" :key="path"><code>{{ path }}</code></div>
+    </div>
     <!-- 헤더 + 액션 -->
     <div class="export-header d-flex justify-content-between align-items-start mb-3">
       <div>
@@ -240,6 +257,9 @@ const totalBytes = computed(() =>
         </div>
       </div>
       <div class="d-flex gap-2">
+        <button v-if="editedPaths.size" class="btn btn-sm btn-outline-secondary" @click="downloadEditBackup">
+          {{ locale.startsWith('en') ? 'Back up edits' : '편집본 백업' }}
+        </button>
         <button v-if="editedPaths.size > 0"
                 class="btn btn-sm btn-outline-danger"
                 @click="clearAllEdits"
@@ -373,6 +393,7 @@ export const TreeNode = defineComponent({
   },
   emits: ['toggle', 'select'],
   setup(props, { emit }) {
+    const { t } = useI18n();
     return () => {
       const { node, parentPath, selected, isExpanded, isEdited } = props;
       if (node.type === 'dir') {

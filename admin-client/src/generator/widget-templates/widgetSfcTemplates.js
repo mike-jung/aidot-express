@@ -475,10 +475,11 @@ function onSubmit() {
 const FORM_DIALOG_WIDGET = (S) => `<script setup>
 /**
  * FormDialogWidget — 버튼 + 모달 + 폼.
- *   [버튼] 클릭 → 모달 열림 → 사용자 입력 → [제출] → @submit(params) 이벤트.
- *   상위 코드에서 store.submitForm(method, params) 호출하고, 성공 시 @success 이벤트로 refresh 유도.
+ *   [버튼] 클릭 → 모달 열림 → 사용자 입력 → [제출] → submitAction(params) 비동기 함수.
+ *   submitAction에서 store.submitForm(method, params)를 기다리고, 성공 시 @success 이벤트로 refresh 유도.
  */
-import { ref, reactive } from 'vue';
+import { ref, reactive, onBeforeUnmount, useId } from 'vue';
+import { errorMessage } from '@/api/axios';
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -488,8 +489,13 @@ const props = defineProps({
   fields: { type: Array, default: () => [] },
   confirmBeforeSubmit: { type: Boolean, default: false },
   method: { type: String, default: 'POST' },
+  submitAction: { type: Function, default: null },
 });
-const emit = defineEmits(['submit', 'success']);
+const emit = defineEmits(['success']);
+const titleId = useId();
+let closeTimer = null;
+let disposed = false;
+onBeforeUnmount(() => { disposed = true; clearTimeout(closeTimer); });
 
 const open = ref(false);
 const values = reactive({});
@@ -504,10 +510,11 @@ function reset() {
   error.value = '';
   success.value = '';
 }
-function openDialog() { reset(); open.value = true; }
-function closeDialog() { open.value = false; }
+function openDialog() { clearTimeout(closeTimer); reset(); open.value = true; }
+function closeDialog() { if (!submitting.value) open.value = false; }
 
 async function doSubmit() {
+  if (submitting.value || success.value) return;
   error.value = '';
   for (const f of (props.fields || [])) {
     if (f.required && (values[f.name] == null || values[f.name] === '')) {
@@ -526,13 +533,15 @@ async function doSubmit() {
       if (f.type === 'boolean') v = v === true || v === 'true';
       out[f.name] = v;
     }
-    // 상위가 store.submitForm 을 호출 — await 가능하도록 Promise 반환 계약.
-    await Promise.resolve(emit('submit', out));
+    // Vue emit() does not return the parent's Promise; await the action prop.
+    if (!props.submitAction) throw new Error('API 연결을 설정해 주세요.');
+    await props.submitAction(out);
+    if (disposed) return;
     success.value = '${S.done}';
     emit('success');
-    setTimeout(() => { open.value = false; }, 600);
+    closeTimer = setTimeout(() => { open.value = false; }, 600);
   } catch (e) {
-    error.value = e?.message || String(e);
+    error.value = errorMessage(e);
   } finally {
     submitting.value = false;
   }
@@ -542,14 +551,14 @@ async function doSubmit() {
 <template>
   <div class="d-inline-block">
     <button :class="'btn btn-' + (buttonVariant || 'primary')" @click="openDialog">{{ buttonLabel }}</button>
-    <div v-if="open"
+    <div v-if="open" role="dialog" aria-modal="true" :aria-labelledby="titleId" @keydown.esc="closeDialog"
          class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
          style="background: rgba(15, 23, 42, 0.45); z-index: 2000;"
          @click.self="closeDialog">
       <div class="card" style="width: 100%; max-width: 480px;">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">{{ dialogTitle || buttonLabel }}</h5>
-          <button class="btn-close" @click="closeDialog"></button>
+          <h5 :id="titleId" class="mb-0">{{ dialogTitle || buttonLabel }}</h5>
+          <button type="button" class="btn-close" @click="closeDialog" :disabled="submitting" aria-label="Close"></button>
         </div>
         <div class="card-body">
           <div v-for="f in (fields || [])" :key="f.name" class="mb-2">
@@ -573,7 +582,7 @@ async function doSubmit() {
         <div class="card-footer d-flex justify-content-end gap-2">
           <button class="btn btn-sm btn-outline-secondary" @click="closeDialog" :disabled="submitting">${S.cancel}</button>
           <button :class="'btn btn-sm btn-' + (buttonVariant || 'primary')"
-                  @click="doSubmit" :disabled="submitting">
+                  @click="doSubmit" :disabled="submitting || !!success">
             <span v-if="submitting">…</span>
             <span v-else>{{ buttonLabel }}</span>
           </button>

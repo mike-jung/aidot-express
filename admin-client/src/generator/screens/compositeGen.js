@@ -79,7 +79,7 @@ export function genCompositeScreen(spec, { resourceCollector = new Map(), screen
 
   const name = viewName(spec);
   return {
-    path: `src/views/composites/${name}.vue`,
+    path: `src/views/${name}.vue`,
     content: assembleSfc({
       imports,
       setup,
@@ -125,7 +125,7 @@ export function genCompositeRouterModule(composites) {
     lines.push(`    path: ${JSON.stringify(routePathFor(spec))},`);
     lines.push(`    name: ${JSON.stringify(pascal(name))},`);
     lines.push(`    props: true,   // route.params 를 props 로 받는다`);
-    lines.push(`    component: () => import('@/views/composites/${name}.vue'),`);
+    lines.push(`    component: () => import('@/views/${name}.vue'),`);
     lines.push('  },');
   }
   lines.push(']');
@@ -152,7 +152,8 @@ export function genCompositeRouterModule(composites) {
  *  이름을 못 만들면 **화면 id 를 뒤에 붙여** 반드시 구분되게 한다.
  *  (id 는 `composite_xxxx` 형태라 항상 있다)
  */
-function viewName(spec) {
+export function viewName(spec) {
+  if (spec.generatedViewName) return spec.generatedViewName;
   const base = fileSafe(pascal(spec.title || ''));
   if (base && base.toLowerCase() !== 'screen') return base + 'View';
 
@@ -185,6 +186,16 @@ function viewName(spec) {
  *     exposed: Set<string>,      // setup 에 등장하는 식별자 이름 (중복 선언 방지)
  *   }
  */
+export function collectEndpointResources(screens, resourceCollector) {
+  const widgets = screens.flatMap(spec => (spec.rows || []).flatMap(row => row.widgets || []))
+    .filter(widget => widget.source?.type === 'endpoint');
+  const priority = widget => !['GET', 'HEAD'].includes(String(widget.source.method || 'GET').toUpperCase()) ? 3
+    : /[{:]/.test(widget.source.path || '') ? 2 : ['list', 'listPaged'].includes(widget.kind) ? 0 : 1;
+  // A storeState resource name refers to its list even if the create/detail screen was added first.
+  widgets.sort((a, b) => priority(a) - priority(b));
+  buildContext({ rows: [{ widgets }] }, resourceCollector);
+}
+
 function buildContext(spec, resourceCollector) {
   const usedResources = new Map();   // c → {Pascal, endpointPath, method, resultKey}
   const widgetBindings = new Map();
@@ -193,24 +204,37 @@ function buildContext(spec, resourceCollector) {
   let ccount = 0;
 
   function ensureResource(name, endpointInfo) {
-    const c = camel(name);
+    let c = camel(name);
     if (!c) return null;
-    if (!usedResources.has(c)) {
-      const info = {
-        Pascal: pascal(name),
+    if (endpointInfo) {
+      const signature = info => JSON.stringify([info.method.toUpperCase(), info.endpointPath, info.resultKey || null]);
+      const match = [...resourceCollector.entries()].find(([, info]) => signature(info) === signature(endpointInfo));
+      if (match) c = match[0];
+      else if (resourceCollector.has(c)) {
+        const suffix = pascal(endpointInfo.method.toLowerCase()) + pascal(endpointInfo.endpointPath.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+        const base = c + suffix;
+        c = base;
+        let n = 2;
+        while (resourceCollector.has(c)) c = base + n++;
+      }
+    }
+    if (!resourceCollector.has(c)) {
+      resourceCollector.set(c, {
+        key: c, Pascal: pascal(c),
         endpointPath: endpointInfo?.endpointPath || `/api/${c}s`,
         method: endpointInfo?.method || 'GET',
         resultKey: endpointInfo?.resultKey || null,
         // 실시간(SSE): 데이터 소스에서 [실시간 자동 갱신] 을 켠 경우에만 채워진다
         realtime: !!endpointInfo?.realtime && !!endpointInfo?.streamPath,
         streamPath: endpointInfo?.streamPath || null,
-      };
-      usedResources.set(c, info);
-      // 호출자가 store 파일을 만들기 위해 collector 에도 등록
-      if (resourceCollector && !resourceCollector.has(c)) {
-        resourceCollector.set(c, { key: c, ...info });
-      }
+      });
     }
+    const info = resourceCollector.get(c);
+    if (endpointInfo?.realtime && endpointInfo.streamPath) {
+      info.realtime = true;
+      info.streamPath = endpointInfo.streamPath;
+    }
+    usedResources.set(c, info);
     return c;
   }
 
@@ -231,6 +255,7 @@ function buildContext(spec, resourceCollector) {
       if (!c) return defaults;
       const rtOn = !!(s.realtime && s.streamPath);
       return {
+        storePrefix: c,
         primary: `${c}CurrentItem`,
         rowsExpr: `${c}Rows`,
         loading: `${c}Loading`,
@@ -247,6 +272,7 @@ function buildContext(spec, resourceCollector) {
       if (!c) return defaults;
       const primary = `${c}${pascal(s.stateName)}`;
       return {
+        storePrefix: c,
         primary,
         rowsExpr: `${c}Rows`,
         loading: `${c}Loading`,
@@ -262,6 +288,7 @@ function buildContext(spec, resourceCollector) {
       const cid = `c${++ccount}`;
       computedDecls.push(`const ${cid} = computed(() => ${computeExpr(srcExpr, s)});`);
       return {
+        storePrefix: c,
         primary: cid,
         rowsExpr: srcExpr,
         loading: `${c}Loading`,
@@ -277,9 +304,15 @@ function buildContext(spec, resourceCollector) {
     return defaults;
   }
 
+  // Register endpoint bindings before dependent storeState/storeCompute widgets.
   for (const row of spec.rows || []) {
     for (const widget of row.widgets || []) {
-      widgetBindings.set(widget.id, resolveWidget(widget));
+      if (widget.source?.type === 'endpoint') widgetBindings.set(widget.id, resolveWidget(widget));
+    }
+  }
+  for (const row of spec.rows || []) {
+    for (const widget of row.widgets || []) {
+      if (!widgetBindings.has(widget.id)) widgetBindings.set(widget.id, resolveWidget(widget));
     }
   }
 
@@ -290,8 +323,7 @@ function buildContext(spec, resourceCollector) {
 
 function buildImports(ctx) {
   const imports = [];
-  const anyRealtime = [...ctx.usedResources.values()].some((i) => i.realtime);
-  imports.push(`import { ref, computed, onMounted${anyRealtime ? ', onBeforeUnmount' : ''} } from 'vue';`);
+  imports.push(`import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';`);
   if (ctx.rowClick?.needsRouter) imports.push(`import { useRouter } from 'vue-router';`);
   if (ctx.usedResources.size > 0) {
     imports.push(`import { storeToRefs } from 'pinia';`);
@@ -364,29 +396,37 @@ function buildSetup(ctx) {
   }
   const usesParam = (info) => screenParams.some((prm) => new RegExp(`(\\{${prm.name}\\}|/:${prm.name}(?![A-Za-z0-9_]))`).test(String(info.endpointPath || '')));
 
-  // onMounted — 각 store 의 fetchList 호출 (+ 실시간 구독)
-  if (ctx.usedResources.size > 0) {
-    const realtimeKeys = [...ctx.usedResources.entries()].filter(([, i]) => i.realtime).map(([c]) => c);
-    lines.push('');
-    lines.push('onMounted(() => {');
-    for (const [c, info] of ctx.usedResources) {
-      if (screenParams.length && usesParam(info)) {
-        lines.push(`  ${c}Store.fetchOne({ ${screenParams.map((prm) => `${prm.name}: props.${prm.name}`).join(', ')} });   // 라우트 파라미터로 단건 조회`);
-      } else {
-        lines.push(`  ${c}Store.fetchList();`);
-      }
-    }
-    for (const c of realtimeKeys) {
-      lines.push(`  ${c}Store.subscribeRealtime();   // 데이터가 바뀌면 자동으로 다시 읽는다`);
-    }
-    lines.push('});');
-    if (realtimeKeys.length) {
-      lines.push('');
-      lines.push('onBeforeUnmount(() => {');
-      for (const c of realtimeKeys) lines.push(`  ${c}Store.unsubscribeRealtime();`);
-      lines.push('});');
+  // Only read endpoints load automatically. Writes run exclusively on form submission.
+  const readResources = [...ctx.usedResources].filter(([, info]) => ['GET', 'HEAD'].includes(info.method.toUpperCase()));
+  const widgetsFor = key => (ctx.spec.rows || []).flatMap(row => row.widgets || []).filter(widget => ctx.widgetBindings.get(widget.id)?.storePrefix === key);
+  const autoResources = readResources.filter(([key, info]) => widgetsFor(key).some(widget => !['formDialog', 'queryForm'].includes(widget.kind))
+    && (!/[{:]/.test(info.endpointPath) || usesParam(info)));
+  const mounted = [];
+  for (const [c, info] of autoResources) {
+    if (screenParams.length && usesParam(info)) {
+      const args = screenParams.map(prm => `${prm.name}: props.${prm.name}`).join(', ');
+      lines.push(`watch(() => [${screenParams.map(prm => `props.${prm.name}`).join(', ')}], () => {`);
+      lines.push(`  void ${c}Store.fetchOne({ ${args} });`);
+      lines.push('}, { immediate: true });');
+    } else {
+      const onlyDetail = widgetsFor(c).every(widget => ['detail', 'queryForm'].includes(widget.kind));
+      const paged = widgetsFor(c).find(widget => widget.kind === 'listPaged');
+      const initial = paged ? `{ perPage: ${Math.max(1, Number(paged.config?.perPage) || 10)} }` : '';
+      mounted.push(`  void ${c}Store.${onlyDetail ? 'fetchOne' : 'fetchList'}(${initial});`);
     }
   }
+  const realtimeKeys = readResources.filter(([, info]) => info.realtime).map(([c]) => c);
+  for (const c of realtimeKeys) mounted.push(`  ${c}Store.subscribeRealtime();`);
+  if (mounted.length) lines.push('onMounted(() => {', ...mounted, '});');
+  if (ctx.usedResources.size) {
+    lines.push('onBeforeUnmount(() => {');
+    for (const [c] of ctx.usedResources) lines.push(`  ${c}Store.cancelReads();`);
+    for (const c of realtimeKeys) lines.push(`  ${c}Store.unsubscribeRealtime();`);
+    lines.push('});');
+  }
+  lines.push('async function refreshData() {');
+  lines.push(`  await Promise.all([${autoResources.map(([c]) => `${c}Store.refresh()`).join(', ')}]);`);
+  lines.push('}');
 
   if (ctx.rowClick?.lines?.length) lines.push(...ctx.rowClick.lines);
   return lines.join('\n');
@@ -435,7 +475,7 @@ function buildTemplate(ctx) {
         || { primary: 'null', rowsExpr: '[]', loading: 'false', error: "''" };
       const widgetStyle = widgetStyleAttr(widget);
       lines.push(`    <div class="col-md-${width}"${widgetStyle}>`);
-      lines.push(`      ${widgetMarkup(widget, binding, fallbackStorePrefix(ctx?.spec || spec))}`);
+      lines.push(`      ${widgetMarkup(widget, binding, ctx.usedResources.keys().next().value || null)}`);
       lines.push(`    </div>`);
     }
     lines.push('  </div>');
@@ -496,7 +536,8 @@ function widgetMarkup(widget, binding, fallbackPrefix = null) {
       const fromRows = /^[A-Za-z_$][\w$]*Rows$/.test(String(binding.rowsExpr))
         ? String(binding.rowsExpr).replace(/Rows$/, '')
         : null;
-      const storePrefix = fromRows || fallbackPrefix;
+      const storePrefix = binding.storePrefix || fromRows || fallbackPrefix;
+      if (!storePrefix) return `<ListPagedWidget title="${title}" :rows="${binding.rowsExpr}" :default-per-page="${perPage}" />`;
       return `<ListPagedWidget title="${title}" :rows="${binding.rowsExpr}" :loading="${binding.loading}" :error="${binding.error}" :page="${storePrefix}Page" :per-page="${storePrefix}PerPage" :total-pages="${storePrefix}TotalPages" :total="${storePrefix}Total" :default-per-page="${perPage}" @change-page="(p) => ${storePrefix}Store.fetchList({ page: p, perPage: ${storePrefix}PerPage })"${rowClickAttrs(widget)} />`;
     }
     case 'detail':
@@ -507,24 +548,24 @@ function widgetMarkup(widget, binding, fallbackPrefix = null) {
       // Phase 33 (patch-12): 사용자가 필드에 입력 후 '조회' → store.fetchOne(params).
       //   binding.rowsExpr 이 없으므로 store 접두사는 widget 의 targetWidgetId 로 추론 어려움.
       //   대신, widget.source 에서 추출한 resource 를 사용.
-      const storePrefix = widgetStorePrefix(widget) || fallbackPrefix;
-      const fieldsJson = JSON.stringify(cfg.fields || []).replace(/'/g, "\\'");
+      const storePrefix = binding.storePrefix || fallbackPrefix;
+      const fieldsJson = escapeAttr(JSON.stringify(cfg.fields || []));
       const submitLabel = escapeAttr(cfg.submitLabel || '조회');
       const endpointHint = cfg.endpointHint ? ` endpoint-hint="${escapeAttr(cfg.endpointHint)}"` : '';
       /* store 가 없으면 제출 핸들러를 만들지 않는다 — 죽는 코드보다 조용한 편이 낫다 */
       const onSubmit = storePrefix ? ` @submit="(params) => ${storePrefix}Store.fetchOne(params)"` : '';
-      return `<QueryFormWidget title="${title}" :fields='${fieldsJson}' submit-label="${submitLabel}"${endpointHint} ${onSubmit} />`;
+      return `<QueryFormWidget title="${title}" :fields="${fieldsJson}" submit-label="${submitLabel}"${endpointHint} ${onSubmit} />`;
     }
     case 'formDialog': {
       // Phase 33 (patch-12): 버튼+모달+폼. 제출 시 store.submitForm(params) → 성공 후 fetchList 재호출.
-      const storePrefix = widgetStorePrefix(widget) || fallbackPrefix;
-      const fieldsJson = JSON.stringify(cfg.fields || []).replace(/'/g, "\\'");
+      const storePrefix = binding.storePrefix || fallbackPrefix;
+      const fieldsJson = escapeAttr(JSON.stringify(cfg.fields || []));
       const btnLabel = escapeAttr(cfg.buttonLabel || '실행');
       const btnVariant = escapeAttr(cfg.buttonVariant || 'primary');
       const dlgTitle = escapeAttr(cfg.dialogTitle || widget.title || btnLabel);
       const confirm = !!cfg.confirmBeforeSubmit;
       const method = escapeAttr(widget.source?.method || 'POST');
-      return `<FormDialogWidget title="${title}" button-label="${btnLabel}" button-variant="${btnVariant}" dialog-title="${dlgTitle}" :fields='${fieldsJson}' :confirm-before-submit="${confirm}" method="${method}" @submit="(params) => ${storePrefix}Store.submitForm('${method}', params)" @success="() => ${storePrefix}Store.fetchList()" />`;
+      return `<FormDialogWidget title="${title}" button-label="${btnLabel}" button-variant="${btnVariant}" dialog-title="${dlgTitle}" :fields="${fieldsJson}" :confirm-before-submit="${confirm}" method="${method}"${storePrefix ? ` :submit-action="(params) => ${storePrefix}Store.submitForm('${method}', params)"` : ''} @success="refreshData" />`;
     }
     case 'markdown': {
       // button / image / kanban placeholder 를 markdown 으로 렌더할 때 약간의 힌트 추가
@@ -541,7 +582,7 @@ function widgetMarkup(widget, binding, fallbackPrefix = null) {
       }
       if (!body && widget.kind !== 'markdown') body = `[${widget.kind} widget — Phase 24 beta]`;
       if (!body) return '<MarkdownWidget body="" />';
-      return `<MarkdownWidget :body='${JSON.stringify(body).replace(/'/g, "\\'")}' />`;
+      return `<MarkdownWidget :body="${escapeAttr(JSON.stringify(body))}" />`;
     }
     default:
       return `<!-- unknown widget kind: ${widget.kind} -->`;

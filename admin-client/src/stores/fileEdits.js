@@ -81,23 +81,13 @@ export const useFileEditsStore = defineStore('fileEdits', {
     /**
      * generator 가 만든 files 배열에 편집본을 합성.
      *  - generator 가 만들어낸 파일에 편집본이 있으면 content 교체
-     *  - generator 가 더 이상 만들지 않는 파일의 편집본은 버림 (obsolete)
+     *  - 경로가 바뀐 파일의 편집본은 보존하고 별도 백업 다운로드 제공
      *  반환: 편집 반영된 새 files 배열 (원본 불변)
      */
     applyTo(projectId, files) {
       const pid = String(projectId);
       const map = this.edits[pid];
       if (!map) return files;
-      const validPaths = new Set(files.map((f) => f.path));
-      // obsolete 제거
-      let dirty = false;
-      for (const p of Object.keys(map)) {
-        if (!validPaths.has(p)) { delete map[p]; dirty = true; }
-      }
-      if (dirty) {
-        if (Object.keys(map).length === 0) delete this.edits[pid];
-        saveToStorage(this.edits);
-      }
       // 편집본 반영
       return files.map((f) => (map[f.path] != null
         ? { ...f, content: map[f.path], edited: true }
