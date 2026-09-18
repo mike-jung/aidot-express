@@ -7,6 +7,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('setup', {
+  read: () => ipcRenderer.invoke('setup:read'),
   testDb: (cfg) => ipcRenderer.invoke('setup:test-db', cfg),
   save: (cfg) => ipcRenderer.invoke('setup:save', cfg),
   skip: () => ipcRenderer.invoke('setup:skip'),

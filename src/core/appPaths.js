@@ -132,7 +132,8 @@ export function existingDirs(kind) {
  *  ⚠ 여기서는 폴더를 만들어 줍니다 — 파일을 쓰려는 시점이므로
  *    "지정만 하고 안 만든" 경우와 다릅니다.
  */
-export function writeDirFor(kind) {
+export function writeDirFor(kind, { create = true } = {}) {
+  const writable = create ? canWrite : canWriteWithoutCreating;
   /* ★ v1.36.3 — **쓸 수 있는 곳**을 찾는다. 뒤에서부터 보는 이유:
      작업 폴더 목록은 "뒤가 이긴다" 순서이고, 설치본의 사용자 폴더가 맨 뒤다.
      예전에는 첫 번째만 보고, 실패하면 기본 경로(= Program Files)로 떨어져
@@ -140,14 +141,25 @@ export function writeDirFor(kind) {
   if (SUBDIR[kind]) {
     for (const ws of [...workspaceRoots()].reverse()) {
       const abs = path.join(ws, SUBDIR[kind]);
-      if (canWrite(abs)) return abs;
+      if (writable(abs)) return abs;
     }
   }
-  for (const d of [...resolveDirs(kind)].reverse()) if (canWrite(d)) return d;
+  for (const d of [...resolveDirs(kind)].reverse()) if (writable(d)) return d;
   /* 어디에도 못 쓰면 그 사실을 분명히 알린다 — 조용히 실패하면 원인을 못 찾는다 */
   throw Object.assign(
     new Error(`쓸 수 있는 폴더가 없습니다 (${kind}). APP_WORKSPACE 를 쓰기 가능한 경로로 지정하세요.`),
     { code: 'NO_WRITABLE_DIR', kind, tried: resolveDirs(kind) });
+}
+
+/** 설정 조회는 폴더를 만들지 않고, 가장 가까운 기존 부모의 쓰기 가능 여부를 확인한다. */
+function canWriteWithoutCreating(dir) {
+  try {
+    let current = dir;
+    while (!fs.existsSync(current)) current = path.dirname(current);
+    if (!fs.statSync(current).isDirectory()) return false;
+    fs.accessSync(current, fs.constants.W_OK);
+    return true;
+  } catch { return false; }
 }
 
 /** 만들 수 있고 쓸 수 있는가 — 실제로 해 본다. 권한은 짐작하면 틀린다. */
@@ -188,10 +200,12 @@ export function findExistingFile(kind, fileNames) {
 
 /** 이 파일이 작업 폴더 것인가 — 목록 화면에서 출처를 표시할 때 쓴다 */
 export function isWorkspaceFile(absPath) {
-  const ws = workspaceRoot();
-  if (!ws || !absPath) return false;
-  const rel = path.relative(ws, path.resolve(absPath));
-  return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+  if (!absPath) return false;
+  // 읽기·쓰기와 같은 작업 폴더 목록을 사용한다. 설치본은 마지막 사용자 폴더에 쓴다.
+  return workspaceRoots().some((ws) => {
+    const rel = path.relative(path.resolve(ws), path.resolve(absPath));
+    return !!rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+  });
 }
 
 export default { projectRoot, workspaceRoot, resolveDirs, existingDirs, writeDirFor, isWorkspaceFile, findExistingFile };

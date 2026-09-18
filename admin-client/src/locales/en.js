@@ -663,6 +663,8 @@ export default {
   },
 
   login: {
+    sessionExpired: 'Your session has expired. Please sign in again.',
+    dbLocalSettings: 'Open the login screen in the installed app to configure its database. Configure an external server on that server.',
     title: 'Sign in',
     subtitle: 'Sign in to open the developer console',
     username: 'User ID',
@@ -945,6 +947,7 @@ export default {
   },
 
   traceList: {
+    perPage: 'Per page', memoryOnly: 'Recent in-memory records only',
     onlyMine: 'Only my requests', why: 'Why', openLogs: 'Open in log explorer',
     listTitle: 'Requests', colTime: 'Time', colRequest: 'Request',
     colStatus: 'Status', colDuration: 'Duration',
@@ -956,6 +959,7 @@ export default {
   },
 
   flow: {
+    staticHint: 'Source call relationships. Use request tracing for the actual branch and loop execution order.', loadDbFailed: 'Could not load database information.',
     title: 'Controller detail', flowTab: 'Processing flow', params: 'Parameters',
     routes: 'Routes', noRoutes: '(no routes)',
     pickHint: 'Click a node or edge to see its detail here.',
@@ -1066,6 +1070,7 @@ export default {
   },
 
   reqDialog: {
+    coverage: 'Collected since startup · up to 24h · since {since} · resolution {resolution} (resets on restart)', bucketSize: 'Each chart point: requests per {interval}',
     title: 'Request frequency by controller',
     sort: 'Sort', requests: 'Requests', avgResponse: 'Avg response',
     maxResponse: 'Max response', errors: 'Errors',
@@ -1241,6 +1246,7 @@ export default {
   },
 
   dash: {
+    refreshing: 'Refreshing…', nextRefresh: 'Refresh in {seconds}s', refreshPaused: 'Auto refresh paused', lastKnown: 'Showing the last confirmed state.',
     configHelp: 'Edits <code>.env</code> and <code>config/*.js</code>. A server {restart} is needed after saving.',
     dbTypeHint: '· Change DB type: <code>DB_TYPE=mariadb</code> (default) or <code>DB_TYPE=sqlite</code>',
     colFile: 'File', colDesc: 'Description', colState: 'State', colSize: 'Size', colMtime: 'Modified',
@@ -1738,6 +1744,7 @@ export default {
   },
 
   set2: {
+    wsInstalled: 'New installed-app files use the user workspace. The setting below adds read locations; counts include all workspaces.', wsWriteTarget: 'New files', wsReadSource: 'Additional source',
     eaiTitle: 'Show EAI menus', eaiNote: 'Shows the EAI controller generator, template editor and abbreviation dictionary menus.', eaiSaved: 'Saved — refresh the page to see the menus',
     scTitle: 'Database schema (tables you create)', scIntro: 'There are three kinds of tables — framework, samples, and your business tables. You can choose where yours live.',
     scSystem: 'Framework', scSample: 'Samples', scMine: 'My tables', scMixed: 'same as framework',

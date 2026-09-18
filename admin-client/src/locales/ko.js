@@ -661,6 +661,8 @@ export default {
   },
 
   login: {
+    sessionExpired: '로그인 세션이 만료되었습니다. 다시 로그인해 주세요.',
+    dbLocalSettings: '설치 앱의 로그인 화면에서 DB 설정을 변경할 수 있습니다. 외부 서버는 해당 서버에서 설정하세요.',
     title: '로그인',
     subtitle: '개발도구 콘솔에 접속하려면 로그인하세요',
     username: '사용자 ID',
@@ -943,6 +945,7 @@ export default {
   },
 
   traceList: {
+    perPage: '페이지당', memoryOnly: '메모리의 최근 기록만 표시',
     onlyMine: '내 요청만', why: '이유', openLogs: '이 요청의 로그 보기',
     listTitle: '요청 목록', colTime: '시각', colRequest: '요청',
     colStatus: '상태', colDuration: '소요',
@@ -954,6 +957,7 @@ export default {
   },
 
   flow: {
+    staticHint: '소스의 호출 관계입니다. 분기·반복의 실제 실행 순서는 요청 추적에서 확인하세요.', loadDbFailed: 'DB 정보를 가져오지 못했습니다.',
     title: '컨트롤러 상세', flowTab: '처리 플로우', params: '파라미터',
     routes: '라우트', noRoutes: '(라우트 없음)',
     pickHint: '노드나 엣지를 클릭하면 상세 정보가 여기에 표시됩니다.',
@@ -1064,6 +1068,7 @@ export default {
   },
 
   reqDialog: {
+    coverage: '서버 시작 이후 수집 · 최대 24시간 · 수집 시작 {since} · 정밀도 {resolution} (재시작 시 초기화)', bucketSize: '차트 한 점: {interval} 동안의 요청 수',
     title: '컨트롤러별 요청 빈도 상세',
     sort: '정렬', requests: '요청수', avgResponse: '평균응답',
     maxResponse: '최대응답', errors: '에러수',
@@ -1239,6 +1244,7 @@ export default {
   },
 
   dash: {
+    refreshing: '갱신 중…', nextRefresh: '{seconds}초 후 갱신', refreshPaused: '자동 갱신 중지', lastKnown: '마지막 확인 상태를 표시합니다.',
     configHelp: '<code>.env</code>, <code>config/*.js</code> 파일을 편집합니다. 저장 후 서버 {restart} 필요.',
     dbTypeHint: '· DB 종류 변경: <code>DB_TYPE=mariadb</code>(기본) 또는 <code>DB_TYPE=sqlite</code>',
     colFile: '파일', colDesc: '설명', colState: '상태', colSize: '크기', colMtime: '수정 시각',
@@ -1734,6 +1740,7 @@ export default {
   },
 
   set2: {
+    wsInstalled: '설치본의 새 파일은 사용자 작업 폴더에 저장합니다. 아래 설정은 추가로 읽을 작업 폴더이며, 파일 수는 모든 작업 폴더를 합산합니다.', wsWriteTarget: '새 파일 저장', wsReadSource: '추가 읽기',
     eaiTitle: 'EAI 연동 메뉴 보이기', eaiNote: '켜면 [EAI 컨트롤러 생성]·[EAI 템플릿 편집]·[EAI 약어 사전] 메뉴가 나타납니다.', eaiSaved: '바뀌었습니다 — 화면을 새로고침하면 메뉴에 반영됩니다',
     scTitle: 'DB 스키마 (내가 만드는 테이블)', scIntro: '테이블은 세 종류입니다 — 시스템 테이블 · 예제 테이블 · 내가 만드는 업무 테이블. 업무 테이블을 둘 스키마를 정할 수 있습니다.',
     scSystem: '시스템 테이블', scSample: '예제 테이블', scMine: '내 업무 테이블', scMixed: '시스템과 같은 곳',

@@ -19,6 +19,7 @@ import process from 'node:process';
 
 const BUCKET_COUNT = 600; // 최근 600초 = 10분 보관
 const BUCKET_MS = 1000;
+const ROUTE_HISTORY_MINUTES = 1440; // 최대 24시간, 긴 구간은 분 단위로 보관
 
 // ─── 초 단위 원형 버퍼 (HTTP / DB 집계용) ───────────────────
 function emptyBucket(tsSec) {
@@ -149,6 +150,7 @@ class MetricsCollector {
         },
         total: { count: 0, errCount: 0, failCount: 0, sumMs: 0, maxMs: 0 },
         buckets: new Array(BUCKET_COUNT),
+        minutes: new Map(),
       };
       for (let i = 0; i < BUCKET_COUNT; i++) entry.buckets[i] = emptyRouteBucket(0);
       this._routes.set(key, entry);
@@ -172,6 +174,21 @@ class MetricsCollector {
     if (durationMs > rb.maxMs) rb.maxMs = durationMs;
     if (isErr) rb.errCount += 1;
     if (isFail) rb.failCount += 1;   // ★ v1.11.9
+
+    // 활성 분에만 저장한다. 라우트당 최대 1440개이며 장시간 미사용 후에도 오래된 값을 정리한다.
+    const minute = Math.floor(tsSec / 60);
+    for (const old of entry.minutes.keys()) {
+      if (old <= minute - ROUTE_HISTORY_MINUTES) entry.minutes.delete(old);
+      else break;
+    }
+    let mb = entry.minutes.get(minute);
+    if (!mb) { mb = emptyRouteBucket(minute * 60); entry.minutes.set(minute, mb); }
+    mb.count++;
+    mb.sumMs += durationMs;
+    mb.maxMs = Math.max(mb.maxMs, durationMs);
+    if (isErr) mb.errCount++;
+    if (isFail) mb.failCount++;
+
   }
 
   /**
@@ -182,13 +199,15 @@ class MetricsCollector {
    */
   getRouteSummary({ windowSec = 60, topN = 50, sortBy = 'count' } = {}) {
     const end = Math.floor(Date.now() / BUCKET_MS);
-    const start = end - Math.max(1, Math.min(BUCKET_COUNT, windowSec)) + 1;
+    const n = Math.max(1, Math.min(86400, Math.floor(windowSec)));
+    const long = n > BUCKET_COUNT;
+    const start = long ? (Math.floor(end / 60) - Math.ceil(n / 60) + 1) * 60 : end - n + 1;
     const rows = [];
     for (const [key, entry] of this._routes.entries()) {
       let count = 0, errCount = 0, failCount = 0, sumMs = 0, maxMs = 0;
-      for (let s = start; s <= end; s++) {
-        const b = entry.buckets[s % BUCKET_COUNT];
-        if (!b || b.tsSec !== s) continue;
+      const buckets = long ? [...entry.minutes.values()] : entry.buckets;
+      for (const b of buckets) {
+        if (!b || b.tsSec < start || b.tsSec > end) continue;
         count += b.count;
         errCount += b.errCount;
         failCount += b.failCount || 0;
@@ -198,7 +217,8 @@ class MetricsCollector {
       rows.push({
         key,
         meta: entry.meta,
-        windowSec: end - start + 1,
+        windowSec: n,
+        resolutionSec: long ? 60 : 1,
         count,
         errCount,
         failCount,
@@ -229,6 +249,7 @@ class MetricsCollector {
    *  @param windowSec
    */
   getRouteSeries(key, windowSec = 60) {
+    if (windowSec > BUCKET_COUNT) return this._getLongRouteSeries(key, windowSec);
     const entry = this._routes.get(key);
     const end = Math.floor(Date.now() / BUCKET_MS);
     const n = Math.max(1, Math.min(BUCKET_COUNT, windowSec));
@@ -252,6 +273,40 @@ class MetricsCollector {
       meta: entry ? entry.meta : null,
       series: result,
     };
+  }
+
+  getRouteCoverage(windowSec = 60) {
+    const now = Date.now();
+    return {
+      collectedSince: new Date(Math.max(this.startedAt, now - 86400_000)).toISOString(),
+      requestedWindowSec: Math.min(86400, windowSec),
+      resolutionSec: windowSec > BUCKET_COUNT ? 60 : 1,
+      retainedSeconds: Math.min(86400, Math.max(0, Math.floor((now - this.startedAt) / 1000))),
+      persistent: false,
+    };
+  }
+
+  _getLongRouteSeries(key, windowSec) {
+    const entry = this._routes.get(key);
+    const endMinute = Math.floor(Date.now() / 60000);
+    const minutes = Math.min(ROUTE_HISTORY_MINUTES, Math.ceil(windowSec / 60));
+    const startMinute = endMinute - minutes + 1;
+    // 최대 120점으로 묶어 장시간/많은 라우트의 응답 크기를 제한한다.
+    const stepMinutes = Math.ceil(minutes / 120);
+    const series = [];
+    for (let from = startMinute; from <= endMinute; from += stepMinutes) {
+      const to = Math.min(endMinute + 1, from + stepMinutes);
+      let count = 0, errCount = 0, failCount = 0, sumMs = 0, maxMs = 0;
+      for (let m = from; m < to; m++) {
+        const b = entry?.minutes.get(m);
+        if (!b) continue;
+        count += b.count; errCount += b.errCount; failCount += b.failCount;
+        sumMs += b.sumMs; maxMs = Math.max(maxMs, b.maxMs);
+      }
+      series.push({ tsSec: from * 60, intervalSec: (to - from) * 60,
+        count, errCount, failCount, avgMs: count ? sumMs / count : 0, maxMs });
+    }
+    return { key, meta: entry?.meta || null, series, resolutionSec: 60, intervalSec: stepMinutes * 60 };
   }
 
   /** DB 쿼리 기록 (db.execute 래퍼가 호출) */

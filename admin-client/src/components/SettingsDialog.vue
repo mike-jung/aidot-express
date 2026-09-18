@@ -537,7 +537,7 @@ function close() { emit('close'); }
                     <span class="badge" :class="ws.data.enabled ? 'text-bg-primary' : 'text-bg-secondary'">
                       {{ ws.data.enabled ? t('set2.wsOn') : t('set2.wsOff') }}
                     </span>
-                    <code class="s-path">{{ ws.data.enabled ? ws.data.configured + '/' : t('set2.wsDefaultDirs') }}</code>
+                    <code class="s-path">{{ ws.data.enabled ? ws.data.activePath : t('set2.wsDefaultDirs') }}</code>
                     <span v-if="ws.data.enabled && !ws.data.exists" class="badge text-bg-warning">{{ t('set2.wsMissing') }}</span>
                     <span class="ms-auto small text-secondary">{{ t('set2.wsTotal', { n: wsTotal }) }}</span>
                   </div>
@@ -548,6 +548,17 @@ function close() { emit('close'); }
                       <code>{{ f.path || ws.data.defaultDirs[f.kind] }}</code>
                       <span class="n" :class="{ zero: !f.count }">{{ f.count }}</span>
                     </div>
+                  </div>
+                </div>
+
+                <div class="small text-secondary mt-2" v-if="ws.data.installedWorkspace">{{ t('set2.wsInstalled') }}</div>
+                <div v-if="ws.data.roots?.length > 1" class="mt-2 small" data-testid="workspace-roots">
+                  <div v-for="root in ws.data.roots" :key="root.path" class="mb-1">
+                    <code>{{ root.path }}</code>
+                    <span class="badge ms-2" :class="root.active ? 'text-bg-primary' : 'text-bg-secondary'">
+                      {{ root.active ? t('set2.wsWriteTarget') : t('set2.wsReadSource') }}
+                    </span>
+                    <span v-if="!root.exists" class="text-secondary ms-2">{{ t('set2.wsMissing') }}</span>
                   </div>
                 </div>
 

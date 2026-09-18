@@ -1,74 +1,80 @@
 import axios from 'axios';
 
-const http = axios.create({
-  baseURL: '/',
-  withCredentials: true,
-  timeout: 15_000,
-});
-
+const http = axios.create({ baseURL: '/', withCredentials: true, timeout: 15_000 });
+const authHttp = axios.create({ baseURL: '/', withCredentials: true, timeout: 5_000 });
 let accessToken = null;
-export function setAccessToken(t) { accessToken = t; }
-export function getAccessToken() { return accessToken; }
+let sessionVersion = 0;
+let refreshPromise = null;
+const listeners = new Set();
 
-http.interceptors.request.use((cfg) => {
-  if (accessToken) {
-    cfg.headers = cfg.headers || {};
-    cfg.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  if (cfg.method !== 'get' && cfg.data && typeof cfg.data === 'object' && !cfg.data.requestCode) {
-    cfg.data.requestCode = `req-${Date.now().toString(36)}`;
-  }
-  return cfg;
-});
-
-let isRefreshing = false;
-let pendingQueue = [];
-function flushQueue(error, newToken) {
-  pendingQueue.forEach(({ resolve, reject, originalRequest }) => {
-    if (error) return reject(error);
-    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-    resolve(http(originalRequest));
-  });
-  pendingQueue = [];
+function publish(session) {
+  accessToken = session?.accessToken || null;
+  for (const listener of listeners) listener(session);
 }
 
-http.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config;
-    const status = error.response?.status;
-    if (status !== 401 || original._retry
-        || original.url?.includes('/api/admin/auth/refresh')
-        || original.url?.includes('/api/admin/auth/login')) {
-      return Promise.reject(error);
+export function setAccessToken(token) {
+  sessionVersion++;
+  accessToken = token || null;
+}
+export function getAccessToken() { return accessToken; }
+export function getSessionVersion() { return sessionVersion; }
+export function onSessionChange(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+// 일반 API와 Control 포트의 동시 401은 같은 refresh 요청을 기다린다.
+export function refreshSession() {
+  if (refreshPromise) return refreshPromise;
+  const version = sessionVersion;
+  refreshPromise = authHttp.post('/api/admin/auth/refresh').then(response => {
+    if (version !== sessionVersion) throw new axios.CanceledError('Session changed');
+    const session = response.data?.data;
+    if (!session?.accessToken) throw new Error('No accessToken');
+    publish(session);
+    return session;
+  }).catch(error => {
+    // 일시적인 네트워크 오류는 세션 폐기와 구분한다.
+    if (version === sessionVersion && [401, 403].includes(error.response?.status)) {
+      sessionVersion++;
+      publish(null);
     }
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push({ resolve, reject, originalRequest: original });
-      });
+    throw error;
+  }).finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+export function installAuthentication(client) {
+  client.interceptors.request.use(cfg => {
+    if (accessToken) cfg.headers.set('Authorization', `Bearer ${accessToken}`);
+    else cfg.headers.delete('Authorization');
+    cfg._sessionVersion = sessionVersion;
+    cfg._sentToken = accessToken;
+    const plainBody = cfg.data && Object.getPrototypeOf(cfg.data) === Object.prototype;
+    if (cfg.method !== 'get' && plainBody && !cfg.data.requestCode) {
+      cfg.data = { ...cfg.data, requestCode: `req-${Date.now().toString(36)}` };
+    }
+    return cfg;
+  });
+  client.interceptors.response.use(response => response, async error => {
+    const original = error.config;
+    if (!original || error.response?.status !== 401 || original._retry || original.signal?.aborted
+        || original._sessionVersion !== sessionVersion
+        || /\/api\/admin\/auth\/(login|refresh|logout|signup)(?:[/?]|$)/.test(original.url || '')) {
+      throw error;
     }
     original._retry = true;
-    isRefreshing = true;
-    try {
-      const r = await http.post('/api/admin/auth/refresh');
-      const newToken = r.data?.data?.accessToken;
-      if (!newToken) throw new Error('No accessToken');
-      setAccessToken(newToken);
-      flushQueue(null, newToken);
-      original.headers.Authorization = `Bearer ${newToken}`;
-      return http(original);
-    } catch (e) {
-      flushQueue(e, null);
-      setAccessToken(null);
-      const { useAuthStore } = await import('../stores/auth.js');
-      useAuthStore().clearLocal();
-      return Promise.reject(e);
-    } finally {
-      isRefreshing = false;
+    // 이미 다른 요청이 갱신했다면 새 토큰을 재사용한다.
+    if (!accessToken || original._sentToken === accessToken) await refreshSession();
+    if (original._sessionVersion !== sessionVersion || original.signal?.aborted) {
+      throw new axios.CanceledError('Session changed');
     }
-  },
-);
+    return client(original);
+  });
+  return client;
+}
 
+installAuthentication(http);
 export default http;
 
 /**

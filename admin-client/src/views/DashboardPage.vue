@@ -18,7 +18,7 @@ import { useI18n } from '../composables/useI18n';
 
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
-import http from '../api/http';
+import http, { installAuthentication } from '../api/http';
 import { controlApiBase } from '../utils/apiUrl.js';
 import CodeEditor from '../components/CodeEditor.vue';
 
@@ -52,13 +52,7 @@ async function resolveControlBase() {
 /** control 용 axios 인스턴스 — 메인 API 와는 다른 baseURL.
  *  메인과 동일한 JWT 를 Authorization 헤더로 전달 (config.auth.accessSecret 공유). */
 const ctrlHttp = computed(() => {
-  const inst = axios.create({ baseURL: controlBase.value, timeout: 10_000 });
-  inst.interceptors.request.use((cfg) => {
-    const token = auth.accessToken;
-    if (token) cfg.headers.Authorization = `Bearer ${token}`;
-    return cfg;
-  });
-  return inst;
+  return installAuthentication(axios.create({ baseURL: controlBase.value, timeout: 10_000 }));
 });
 
 /* ========== 상태 ========== */
@@ -77,39 +71,56 @@ const liveIntervalMs = ref(30_000);  // 기본 30초
 let pollTimer = null;
 
 async function loadStatus() {
+  if (loading.value) return;
   loading.value = true;
-  error.value = null;
   try {
     if (!controlBase.value) await resolveControlBase();
     const r = await ctrlHttp.value.get('/api/control/status');
     status.value = r.data?.data || null;
+    error.value = null;
   } catch (e) {
     error.value = e.response?.data?.message || e.message;
-    // control 서버 자체에 접근 불가하면 상태를 null 로
-    if (!e.response) status.value = null;
+    // 이전 성공 상태는 유지한다. 오류가 있으면 마지막 확인값임을 함께 표시한다.
   } finally { loading.value = false; }
 }
 
+const refreshing = ref(false);
+const nextRefreshAt = ref(null);
+const secondsToRefresh = computed(() => nextRefreshAt.value == null ? null
+  : Math.max(0, Math.ceil((nextRefreshAt.value - nowTick.value) / 1000)));
+let disposed = false;
+
+function stopPolling() {
+  clearTimeout(pollTimer);
+  pollTimer = null;
+  nextRefreshAt.value = null;
+}
 function startPolling() {
   stopPolling();
-  if (!liveEnabled.value) return;
-  pollTimer = setInterval(loadStatus, liveIntervalMs.value);
+  if (!liveEnabled.value || refreshing.value || disposed) return;
+  nextRefreshAt.value = Date.now() + liveIntervalMs.value;
+  pollTimer = setTimeout(refreshDashboard, liveIntervalMs.value);
 }
-function stopPolling() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+async function refreshDashboard() {
+  if (refreshing.value || disposed) return;
+  stopPolling();
+  refreshing.value = true;
+  try {
+    await Promise.allSettled([loadStatus(), loadMci(), refreshDbHealth()]);
+  } finally {
+    refreshing.value = false;
+    startPolling();
+  }
 }
-
-watch(liveEnabled, (on) => { if (on) startPolling(); else stopPolling(); });
-watch(liveIntervalMs, () => startPolling());
-
+watch([liveEnabled, liveIntervalMs], startPolling);
 onMounted(() => {
-  loadStatus();
-  startPolling();
+  refreshDashboard();
   tickTimer = setInterval(() => { nowTick.value = Date.now(); }, 1000);
 });
 onBeforeUnmount(() => {
+  disposed = true;
   stopPolling();
-  if (tickTimer) clearInterval(tickTimer);
+  clearInterval(tickTimer);
 });
 
 /* ========== Control 액션 — Bootstrap confirm modal ========== */
@@ -213,6 +224,7 @@ const mci = ref(null);
 const mciLoading = ref(false);
 const mciError = ref(null);
 async function loadMci() {
+  if (mciLoading.value) return;
   mciLoading.value = true;
   try {
     const r = await http.get('/api/admin/system/mci');
@@ -230,15 +242,9 @@ const mciStateBadge = computed(() => {
   const map = { closed: 'bg-success', open: 'bg-danger', 'half-open': 'bg-warning text-dark', disabled: 'bg-secondary' };
   return { cls: map[m.state] || 'bg-secondary', text: t(`dash.mciState_${String(m.state).replace('-', '_')}`) };
 });
-let mciTimer = null;
-watch(liveEnabled, (on) => { if (on) { clearInterval(mciTimer); mciTimer = setInterval(loadMci, liveIntervalMs.value); } else { clearInterval(mciTimer); mciTimer = null; } });
-watch(liveIntervalMs, () => { if (liveEnabled.value) { clearInterval(mciTimer); mciTimer = setInterval(loadMci, liveIntervalMs.value); } });
-onMounted(() => { loadMci(); if (liveEnabled.value) mciTimer = setInterval(loadMci, liveIntervalMs.value); });
-onBeforeUnmount(() => { if (mciTimer) clearInterval(mciTimer); });
-
-function saveCtrlBaseUrl(v) {
+async function saveCtrlBaseUrl(v) {
   if (v) { localStorage.setItem('ctrlBaseUrl', v); controlBase.value = v; }
-  else   { localStorage.removeItem('ctrlBaseUrl'); controlBase.value = resolveControlBase(); }
+  else   { localStorage.removeItem('ctrlBaseUrl'); controlBase.value = ''; await resolveControlBase(); }
   loadStatus();
 }
 
@@ -343,13 +349,13 @@ const configTabDirty = computed(() => {
 
 onMounted(() => {
   loadConfigFiles();
-  refreshDbHealth();
 });
 
 /* ========== DB 헬스 상태 (상단 배지) ========== */
 const dbHealth = ref({ ok: null });
 const dbHealthLoading = ref(false);
 async function refreshDbHealth() {
+  if (dbHealthLoading.value) return;
   dbHealthLoading.value = true;
   try {
     const r = await http.get('/api/admin/system/health');
@@ -422,7 +428,10 @@ const dbCardTooltip = computed(() => {
             <option :value="30000">{{ fmtInterval(30000) }}</option>
             <option :value="60000">{{ fmtInterval(60000) }}</option>
           </select>
-          <button class="btn btn-sm btn-outline-secondary" @click="loadStatus" :disabled="loading">
+          <span class="small text-secondary refresh-countdown" data-testid="dashboard-countdown">
+            {{ refreshing ? t('dash.refreshing') : liveEnabled ? t('dash.nextRefresh', { seconds: secondsToRefresh }) : t('dash.refreshPaused') }}
+          </span>
+          <button class="btn btn-sm btn-outline-secondary" @click="refreshDashboard" :disabled="refreshing">
             <i class="bi bi-arrow-clockwise"></i> {{ t('dash.reload') }}
           </button>
         </div>
@@ -432,6 +441,7 @@ const dbCardTooltip = computed(() => {
         <div v-if="error" class="alert alert-danger small mb-3">
           <i class="bi bi-exclamation-triangle me-1"></i>
           {{ error }}
+          <span v-if="status" class="ms-2">{{ t('dash.lastKnown') }}</span>
           <div class="mt-1 text-secondary">{{ t('dash.controlUrl') }} <code>{{ controlBase }}</code></div>
         </div>
 
@@ -905,6 +915,7 @@ const dbCardTooltip = computed(() => {
 </template>
 
 <style scoped>
+.refresh-countdown { min-width: 150px; font-variant-numeric: tabular-nums; }
 .dashboard-page { padding-bottom: 24px; }
 .card-header { background: #f8f9fb; }
 .stat-card {

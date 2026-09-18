@@ -4,7 +4,7 @@ const externalServer = require('./external-server.cjs');
 const { showInitialPassword } = require('./initial-password.cjs');
 const { createPasswordClient } = require('./initial-password-client.cjs');
 const { ensureEnvSecret } = require('../src/core/secretPolicy.cjs');
-const { sameOrigin, assertSender, trustedSender, lockLocalWindow, validateSetup, envLine } = require('./security.cjs');
+const { sameOrigin, assertSender, trustedSender, lockLocalWindow } = require('./security.cjs');
 /**
  * Aidot Express — Electron main process.
  *
@@ -276,126 +276,15 @@ function isFirstRun() {
   return !fs.existsSync(path.join(app.getPath('userData'), '.env'));
 }
 
-/** `.env` 의 한 줄을 바꾼다. 없으면 끝에 붙인다. 주석과 순서는 그대로 둔다. */
-function setEnvValue(text, key, value) {
-  const line = envLine(key, value);
-  const re = new RegExp(`^#?\\s*${key}\\s*=.*$`, 'm');
-  return re.test(text) ? text.replace(re, () => line) : `${text.replace(/\n*$/, '')}\n${line}\n`;
-}
-
-/**
- * 처음 설정 창 — DB 접속 정보를 받는다.
- *
- *  왜 서버보다 먼저 띄우나: 접속 정보가 틀리면 서버는 어차피 죽는다.
- *  죽은 뒤 "확인하세요" 라고 말하는 것보다, 시작하기 전에 물어보고
- *  **그 자리에서 연결을 시험해 보는** 편이 낫다.
- *
- *  @returns {Promise<'saved'|'skipped'>}
- */
-function showSetupWindow(envPath) {
-  const fs = require('node:fs');
-  return new Promise((resolve) => {
-    const win = new BrowserWindow({
-      width: 560, height: 620, resizable: false, minimizable: false, maximizable: false,
-      title: 'Aidot Express — 처음 설정',
-      webPreferences: {
-        preload: path.join(__dirname, 'setup-preload.cjs'),
-        contextIsolation: true, nodeIntegration: false, sandbox: true,
-      },
-    });
-    lockLocalWindow(win);
-    win.setMenuBarVisibility(false);
-    win.loadFile(path.join(__dirname, 'setup.html'));
-
-    let done = false;
-    const finish = (how) => {
-      if (done) return;
-      done = true;
-      ipcMain.removeHandler('setup:test-db');
-      ipcMain.removeHandler('setup:save');
-      ipcMain.removeHandler('setup:skip');
-      if (!win.isDestroyed()) win.close();
-      resolve(how);
-    };
-
-    ipcMain.handle('setup:test-db', async (event, cfg) => {
-      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
-      return testDbConnection(validateSetup(cfg));
-    });
-
-    ipcMain.handle('setup:save', async (event, cfg) => {
-      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
-      cfg = validateSetup(cfg);
-      try {
-        let text = fs.readFileSync(envPath, 'utf8');
-        text = setEnvValue(text, 'DB_TYPE', cfg.type);
-        text = setEnvValue(text, 'DB_DATABASE', cfg.database || 'aidot_express');
-        text = setEnvValue(text, 'PORT', cfg.serverPort || '7901');
-        text = setEnvValue(text, 'CONTROL_PORT', String(Number(cfg.serverPort || '7901') + 1));
-        text = setEnvValue(text, 'HOST', '127.0.0.1');
-        text = setEnvValue(text, 'CONTROL_HOST', '127.0.0.1');
-        if (cfg.type === 'sqlite') {
-          text = setEnvValue(text, 'DB_FILE', cfg.dbfile || 'data/app.db');
-        } else {
-          text = setEnvValue(text, 'DB_HOST', cfg.host || '127.0.0.1');
-          text = setEnvValue(text, 'DB_PORT', cfg.port || '3306');
-          text = setEnvValue(text, 'DB_USER', cfg.user || 'root');
-          text = setEnvValue(text, 'DB_PASSWORD', cfg.password ?? '');
-        }
-        fs.writeFileSync(envPath, text, 'utf8');
-        console.log('[electron] 처음 설정을 저장했습니다');
-        finish('saved');
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, message: `저장하지 못했습니다: ${e.message}` };
-      }
-    });
-
-    ipcMain.handle('setup:skip', (event) => {
-      assertSender(event, win, path.join(__dirname, 'setup.html'), { file: true });
-      finish('skipped'); return { ok: true };
-    });
-
-    /* 창을 그냥 닫아도 진행은 되어야 한다 — 갇히면 안 된다 */
-    win.on('closed', () => finish('skipped'));
-  });
-}
-
-/**
- * 입력한 정보로 실제 연결해 본다.
- *
- *  ⚠ 스키마가 아직 없을 수 있으므로 **DB 이름 없이** 붙는다.
- *    서버는 기동할 때 스키마를 만들 수 있고, 여기서 "없다" 고 막으면
- *    사용자가 할 수 없는 일을 요구하게 된다.
- */
-async function testDbConnection(cfg) {
-  if (cfg.type === 'sqlite') return { ok: true, version: 'SQLite (내장)' };
-  try {
-    /* ⚠ 이 프로젝트의 드라이버는 `mariadb` 다 (`mysql2` 가 아니다).
-       없는 모듈을 부르면 연결 시험이 늘 실패하고, 사용자는 DB 문제로 오해한다. */
-    const mariadb = require('mariadb');
-    const conn = await mariadb.createConnection({
-      host: cfg.host || '127.0.0.1',
-      port: Number(cfg.port) || 3306,
-      user: cfg.user || 'root',
-      password: cfg.password ?? '',
-      connectTimeout: 4000,
-      /* 스키마는 아직 없을 수 있으므로 지정하지 않는다 — 서버가 기동할 때 만든다 */
-    });
-    const rows = await conn.query('SELECT VERSION() AS v');
-    await conn.end();
-    return { ok: true, version: rows?.[0]?.v || '' };
-  } catch (e) {
-    /* 흔한 것은 풀어서 알려 준다 — 코드만 보고는 무엇을 고쳐야 할지 알기 어렵다 */
-    const hint = {
-      ECONNREFUSED: 'DB 가 그 주소·포트에서 듣고 있지 않습니다.',
-      ETIMEDOUT: '주소에 닿지 못했습니다. 방화벽을 확인하세요.',
-      ER_ACCESS_DENIED_ERROR: '사용자 이름이나 비밀번호가 맞지 않습니다.',
-      ER_ACCESS_DENIED_NO_PASSWORD_ERROR: '사용자 이름이나 비밀번호가 맞지 않습니다.',
-      ENOTFOUND: '그 주소를 찾지 못했습니다.',
-    }[e.code];
-    return { ok: false, message: hint ? `${hint}\n(${e.code})` : (e.message || String(e)) };
-  }
+// 첫 설치와 로그인 전 DB 복구가 같은 입력·검증·저장 경로를 사용한다.
+let setupPromise = null;
+function showSetupWindow(envPath, recovery = false) {
+  if (setupPromise) return setupPromise;
+  setupPromise = require('./db-setup.cjs').showSetupWindow({
+    electron: { BrowserWindow, ipcMain }, envPath,
+    parent: recovery ? mainWin : null, recovery,
+  }).finally(() => { setupPromise = null; });
+  return setupPromise;
 }
 
 app.whenReady().then(async () => {
@@ -883,4 +772,23 @@ ipcMain.handle('app:restart', (event) => {
   app.relaunch();
   setImmediate(() => doQuit());
   return true;
+});
+
+// 설치 앱이 직접 관리하는 DB만 복구한다. 원격 서버 설정은 이 컴퓨터에서 바꾸지 않는다.
+let dbRecoveryPromise = null;
+ipcMain.handle('app:configure-db', (event) => {
+  assertSender(event, mainWin, VITE_DEV_URL || serverUrl());
+  if (serverExternal) throw new Error('외부 서버의 DB 설정은 해당 서버에서 변경해야 합니다.');
+  if (dbRecoveryPromise) return dbRecoveryPromise;
+  const envPath = httpsConfig.envPath(process.cwd(), {
+    ...process.env, ELECTRON_USER_DATA_PATH: app.getPath('userData'),
+  });
+  dbRecoveryPromise = showSetupWindow(envPath, true).then((result) => {
+    if (result === 'saved') {
+      app.relaunch();
+      setImmediate(() => doQuit());
+    }
+    return { saved: result === 'saved' };
+  }).finally(() => { dbRecoveryPromise = null; });
+  return dbRecoveryPromise;
 });

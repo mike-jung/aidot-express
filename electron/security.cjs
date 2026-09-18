@@ -35,7 +35,7 @@ function lockLocalWindow(win) {
 function validateSetup(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid setup settings');
   const out = {};
-  for (const key of ['type', 'database', 'serverPort', 'dbfile', 'host', 'port', 'user', 'password']) {
+  for (const key of ['type', 'database', 'serverPort', 'dbfile', 'host', 'port', 'user', 'password', 'service']) {
     if (input[key] == null) continue;
     const value = String(input[key]);
     if (value.length > 1024 || /[\r\n\0]/.test(value)) throw new Error(`Invalid setup value: ${key}`);

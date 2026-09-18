@@ -43,8 +43,8 @@ SELECT request_id, trace_id, ts, method, path, route, status, duration_ms,
    AND (:min_ms     IS NULL OR duration_ms >= :min_ms)
    AND (:from_ts    IS NULL OR ts >= :from_ts)
    AND (:to_ts      IS NULL OR ts <= :to_ts)
- ORDER BY ts DESC
- LIMIT :limit;
+ ORDER BY ts DESC, request_id DESC
+ LIMIT :limit OFFSET :offset;
 
 -- @name: countTraces
 SELECT COUNT(*) AS cnt

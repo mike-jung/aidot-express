@@ -40,7 +40,7 @@ function needsInstall(dir, probes) {
 }
 
 /* ① 루트 — electron-builder 는 여기 있다 */
-if (needsInstall(ROOT, ['electron-builder', 'electron', '.bin'])) {
+if (needsInstall(ROOT, ['electron-builder', 'electron', '@babel/parser', '.bin'])) {
   console.log('▶ Installing root dependencies (electron is large — this may take a few minutes) …');
   run(['install'], ROOT, '루트 의존성');
 } else {

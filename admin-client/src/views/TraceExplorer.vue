@@ -13,7 +13,7 @@
  *  그래서 탭 세 개가 아니라 **세 개의 진입점 + 하나의 상세**로 짰다.
  *  상세 화면 안에서 이야기 ↔ 폭포수 ↔ 원자료를 오갈 수 있다.
  */
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 // ★ v1.10.3 — 다국어
 import { useI18n, locale } from '../composables/useI18n';
 
@@ -24,6 +24,7 @@ import { useAuthStore } from '../stores/auth';
 import http from '../api/http';
 import { notifyError } from '../composables/useNotify';
 import RequestDotPlot from '../components/RequestDotPlot.vue';
+import Pagination from '../components/Pagination.vue';
 
 import { useDuration } from '../utils/duration';   // ★ v1.19.4
 
@@ -164,20 +165,53 @@ const rows = ref([]);
 const loading = ref(false);
 const searched = ref(false);
 
-async function search() {
-  loading.value = true;
+const page = ref(1);
+const perPage = ref(25);
+const total = ref(0);
+const totalPages = ref(1);
+const listLoading = ref(false);
+const listSource = ref('db');
+let searchController;
+let searchSequence = 0;
+let appliedFilters = {};
+
+function search() {
+  appliedFilters = Object.fromEntries(Object.entries(filters.value)
+    .filter(([, value]) => value !== '' && value != null));
+  return loadPage(1);
+}
+
+async function loadPage(requestedPage) {
+  searchController?.abort();
+  searchController = new AbortController();
+  const ticket = ++searchSequence;
+  listLoading.value = true;
   try {
-    const params = {};
-    for (const [k, v] of Object.entries(filters.value)) if (v !== '' && v != null) params[k] = v;
-    const r = await http.get('/api/admin/trace', { params });
-    rows.value = r.data?.data || [];
+    const r = await http.get('/api/admin/trace', {
+      params: { ...appliedFilters, page: requestedPage, perPage: perPage.value },
+      signal: searchController.signal,
+    });
+    if (ticket !== searchSequence) return;
+    const body = r.data;
+    rows.value = body.data || [];
+    page.value = body.header.page;
+    total.value = body.header.total;
+    totalPages.value = body.header.totalPages;
+    listSource.value = body.source;
     searched.value = true;
   } catch (e) {
-    notifyError(t('designer.trc_queryFailed'), e);
+    if (ticket === searchSequence && e.code !== 'ERR_CANCELED') {
+      notifyError(t('designer.trc_queryFailed'), e);
+    }
   } finally {
-    loading.value = false;
+    if (ticket === searchSequence) listLoading.value = false;
   }
 }
+
+onBeforeUnmount(() => {
+  searchSequence++;
+  searchController?.abort();
+});
 
 /** 자주 쓰는 조건은 버튼으로 — 매번 조합을 기억하게 하지 않는다 */
 function preset(kind) {
@@ -500,8 +534,8 @@ onMounted(() => {
           <!-- ★ v1.16.5 — d-grid 라서 칸 높이만큼 늘어나 거대한 파란 덩어리가 됐다.
                라벨 자리를 비워 다른 입력과 아래를 맞추고, 글자를 넣어 무슨 단추인지 보이게 한다. -->
           <div class="col-12 col-md-2 d-flex align-items-end">
-            <button type="button" class="btn btn-sm btn-primary w-100" :disabled="loading" @click="search">
-              <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+            <button type="button" class="btn btn-sm btn-primary w-100" :disabled="listLoading" @click="search">
+              <span v-if="listLoading" class="spinner-border spinner-border-sm me-1"></span>
               <i v-else class="bi bi-search me-1"></i>{{ t('traceUi.search') }}
             </button>
           </div>
@@ -515,7 +549,8 @@ onMounted(() => {
         <div class="card mb-3">
           <div class="card-header d-flex align-items-center">
             <i class="bi bi-list-ul me-2"></i>{{ t('traceList.listTitle') }}
-            <span class="ms-2 badge bg-secondary">{{ rows.length }}</span>
+            <span class="ms-2 badge bg-secondary">{{ total }}</span>
+            <span v-if="listSource === 'memory'" class="small text-warning ms-2">{{ t('traceList.memoryOnly') }}</span>
           </div>
           <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
             <table class="table table-hover align-middle mb-0">
@@ -529,13 +564,13 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="loading"><td colspan="4" class="text-center text-secondary py-4">
+                <tr v-if="listLoading"><td colspan="5" class="text-center text-secondary py-4">
                   <span class="spinner-border spinner-border-sm me-2"></span>{{ t('common.loading') }}
                 </td></tr>
-                <tr v-else-if="!rows.length"><td colspan="4" class="text-center text-secondary py-4">
+                <tr v-else-if="!rows.length"><td colspan="5" class="text-center text-secondary py-4">
                   {{ searched ? '조건에 맞는 요청이 없습니다.' : '위에서 조건을 골라 조회하세요.' }}
                 </td></tr>
-                <tr v-for="r in rows" :key="r.request_id"
+                <tr v-for="r in (listLoading ? [] : rows)" :key="r.request_id"
                     style="cursor: pointer"
                     :class="{ 'table-active': detail?.requestId === r.request_id }"
                     @click="lookup(r.request_id)">
@@ -559,6 +594,18 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="card-footer d-flex align-items-center justify-content-between gap-2 flex-wrap" data-testid="trace-pagination">
+            <label class="d-flex align-items-center gap-2 small">
+              {{ t('traceList.perPage') }}
+              <select v-model.number="perPage" class="form-select form-select-sm w-auto"
+                      :disabled="listLoading" @change="loadPage(1)">
+                <option :value="10">10</option><option :value="25">25</option>
+                <option :value="50">50</option><option :value="100">100</option>
+              </select>
+            </label>
+            <span class="small text-secondary">{{ page }} / {{ totalPages }}</span>
+            <Pagination :page="page" :total-pages="totalPages" @update:page="loadPage" />
           </div>
         </div>
 

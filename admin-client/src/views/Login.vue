@@ -25,6 +25,25 @@ const { t, locale, locales, setLocale } = useI18n();
 
 const dbHealth = ref({ ok: null });
 const dbHealthLoading = ref(false);
+const dbSetupLoading = ref(false);
+
+async function onDbStatusClick() {
+  if (dbSetupLoading.value) return;
+  if (dbHealth.value.ok !== false) return checkHealth();
+  if (!window.electronApp?.configureDatabase) {
+    error.value = t('login.dbLocalSettings');
+    return checkHealth();
+  }
+  dbSetupLoading.value = true;
+  try {
+    await window.electronApp.configureDatabase();
+    await checkHealth();
+  } catch (e) {
+    error.value = e.message || t('login.dbLocalSettings');
+  } finally {
+    dbSetupLoading.value = false;
+  }
+}
 
 async function checkHealth() {
   dbHealthLoading.value = true;
@@ -61,6 +80,7 @@ const dbCardTooltip = computed(() => {
 
 onMounted(() => {
   checkHealth();
+  if (route.query.reason === 'expired') error.value = t('login.sessionExpired');
   try {
     const saved = localStorage.getItem(REMEMBER_KEY);
     if (saved) { form.username = saved; rememberId.value = true; }
@@ -309,10 +329,11 @@ export default { data() { return { brandSvg }; } };
       </div>
 
       <!-- DB 상태 — 우하단 칩 -->
-      <div class="db-health-chip"
+      <button type="button" class="db-health-chip"
+           :disabled="dbHealthLoading || dbSetupLoading"
            :class="dbHealth.ok === true ? 'is-ok' : (dbHealth.ok === false ? 'is-fail' : 'is-unknown')"
            :title="dbCardTooltip"
-           @click="checkHealth">
+           @click="onDbStatusClick">
         <i class="bi"
            :class="dbHealth.ok === true ? 'bi-database-check' :
                    dbHealth.ok === false ? 'bi-database-x' : 'bi-database'"></i>
@@ -321,8 +342,9 @@ export default { data() { return { brandSvg }; } };
           <template v-else-if="dbHealth.ok === false">{{ t('login.dbFail') }}</template>
           <template v-else>{{ t('login.dbChecking') }}</template>
         </span>
-        <i v-if="dbHealthLoading" class="bi bi-arrow-repeat spinning ms-1"></i>
-      </div>
+        <i v-if="dbHealthLoading || dbSetupLoading" class="bi bi-arrow-repeat spinning ms-1"></i>
+        <i v-else-if="dbHealth.ok === false" class="bi bi-gear ms-1"></i>
+      </button>
 
       <!-- 무엇을 고쳐야 하는지 화면에서 바로 알려 준다 (개발 모드에서만 hint 가 내려온다) -->
       <div v-if="dbHealth.ok === false && dbHealth.hint" class="db-health-hint">

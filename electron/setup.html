@@ -32,8 +32,8 @@ legend{font-size:12px;color:var(--dim);padding:0 6px}
 </style>
 </head>
 <body>
-<h1>처음 설정</h1>
-<div class="sub">데이터베이스 연결 정보를 입력하세요. 나중에 설정 화면에서 바꿀 수 있습니다.</div>
+<h1 id="heading">처음 설정</h1>
+<div class="sub" id="subtitle">데이터베이스 연결 정보를 입력하세요. 나중에 설정 화면에서 바꿀 수 있습니다.</div>
 
 <fieldset>
   <legend>데이터베이스</legend>
@@ -41,18 +41,20 @@ legend{font-size:12px;color:var(--dim);padding:0 6px}
     <select id="type">
       <option value="mariadb">MariaDB</option>
       <option value="mysql">MySQL</option>
+      <option value="oracle">Oracle</option>
       <option value="sqlite">SQLite (파일 하나 · 시험용)</option>
     </select></div>
   <div class="row db"><label for="host">주소</label><input id="host" value="127.0.0.1"></div>
   <div class="row db"><label for="port">포트</label><input id="port" value="3306"></div>
   <div class="row db"><label for="user">사용자</label><input id="user" value="root"></div>
   <div class="row db"><label for="password">비밀번호</label><input id="password" type="password"></div>
+  <div class="row oracle" style="display:none"><label for="service">서비스 이름</label><input id="service"></div>
   <div class="row"><label for="database">스키마</label><input id="database" value="aidot_express"></div>
   <div class="hint db">없으면 기동할 때 만들어 봅니다. 계정에 CREATE 권한이 없으면 미리 만들어 두세요.</div>
   <div class="row sqlite" style="display:none"><label for="dbfile">파일</label><input id="dbfile" value="data/app.db"></div>
 </fieldset>
 
-<fieldset>
+<fieldset id="server-settings">
   <legend>서버</legend>
   <div class="row"><label for="srvport">포트</label><input id="srvport" value="7901"></div>
   <div class="hint">콘솔 주소가 됩니다 — http://localhost:<span id="portEcho">7901</span></div>
@@ -66,52 +68,6 @@ legend{font-size:12px;color:var(--dim);padding:0 6px}
 </div>
 <div id="msg"></div>
 
-<script>
-const $ = (id) => document.getElementById(id);
-const msg = (text, kind) => { const m = $('msg'); m.textContent = text; m.className = kind || ''; };
-
-function collect() {
-  return {
-    type: $('type').value,
-    host: $('host').value.trim(),
-    port: $('port').value.trim(),
-    user: $('user').value.trim(),
-    password: $('password').value,
-    database: $('database').value.trim(),
-    dbfile: $('dbfile').value.trim(),
-    serverPort: $('srvport').value.trim(),
-  };
-}
-
-/* SQLite 는 주소·계정이 필요 없다 — 보이면 오히려 헷갈린다 */
-function syncType() {
-  const isSqlite = $('type').value === 'sqlite';
-  document.querySelectorAll('.db').forEach((e) => { e.style.display = isSqlite ? 'none' : ''; });
-  document.querySelectorAll('.sqlite').forEach((e) => { e.style.display = isSqlite ? '' : 'none'; });
-  $('port').value = $('type').value === 'mysql' ? '3306' : ($('port').value || '3306');
-  $('test').disabled = isSqlite;
-  msg('');
-}
-$('type').addEventListener('change', syncType);
-$('srvport').addEventListener('input', () => { $('portEcho').textContent = $('srvport').value || '7901'; });
-
-$('test').addEventListener('click', async () => {
-  $('test').disabled = true; msg('연결해 보는 중…');
-  const r = await window.setup.testDb(collect());
-  $('test').disabled = false;
-  if (r.ok) msg(`연결됐습니다.${r.version ? '\n서버: ' + r.version : ''}`, 'ok');
-  else msg(`연결하지 못했습니다.\n${r.message}`, 'bad');
-});
-
-$('save').addEventListener('click', async () => {
-  $('save').disabled = true; msg('저장하는 중…');
-  const r = await window.setup.save(collect());
-  if (!r.ok) { $('save').disabled = false; msg(r.message, 'bad'); }
-});
-
-$('later').addEventListener('click', () => window.setup.skip());
-
-syncType();
-</script>
+<script src="setup-renderer.js"></script>
 </body>
 </html>

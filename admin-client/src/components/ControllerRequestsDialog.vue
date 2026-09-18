@@ -44,6 +44,10 @@ const allRows    = ref([]);   // 전체 (서버 응답)
 const loading    = ref(false);
 const error      = ref(null);
 const selectedKey = ref(null);
+const coverage = ref(null);
+let loadController;
+let loadSequence = 0;
+let disposed = false;
 
 // 페이지네이션 (클라이언트)
 const page    = ref(1);
@@ -60,28 +64,35 @@ let pollTimer = null;
 
 /* ───── 데이터 로딩 ───── */
 async function load() {
+  if (disposed) return;
+  loadController?.abort();
+  loadController = new AbortController();
+  const ticket = ++loadSequence;
   loading.value = true;
-  error.value = null;
   try {
     const r = await http.get('/api/admin/metrics/routes', {
+      signal: loadController.signal,
       params: { windowSec: windowSec.value, sortBy: sortBy.value, includeSeries: 1, limit: 500 },
     });
+    if (ticket !== loadSequence) return;
     const data = r.data?.data || {};
+    error.value = null;
+    coverage.value = data.coverage;
     allRows.value = data.rows || [];
     // 첫 로드 시 기본 선택 (전체 기준 1위)
-    if (!selectedKey.value && allRows.value.length > 0) {
+    if (!allRows.value.some(row => row.key === selectedKey.value) && allRows.value.length > 0) {
       selectedKey.value = allRows.value[0].key;
     }
   } catch (e) {
-    error.value = e.response?.data?.message || e.message;
+    if (ticket === loadSequence && e.code !== 'ERR_CANCELED') error.value = e.response?.data?.message || e.message;
   } finally {
-    loading.value = false;
+    if (ticket === loadSequence) loading.value = false;
   }
 }
 
 function startPolling() {
   stopPolling();
-  if (!liveEnabled.value) return;
+  if (!liveEnabled.value || disposed) return;
   pollTimer = setInterval(load, refreshMs.value);
 }
 function stopPolling() {
@@ -96,7 +107,7 @@ onMounted(async () => {
   await load();
   startPolling();
 });
-onBeforeUnmount(stopPolling);
+onBeforeUnmount(() => { disposed = true; loadSequence++; loadController?.abort(); stopPolling(); });
 
 /* ───── 선택된 라우트 / 파생 ───── */
 const selected = computed(() =>
@@ -158,12 +169,16 @@ function displayPath(r) {
         <h5 class="mb-0">
           <i class="bi bi-bar-chart-line text-primary me-2"></i>
           {{ t('reqDialog.title') }}
-          <small class="text-secondary ms-2">최근 {{ windowSec }}초 기준 · 총 {{ allRows.length }}개 라우트</small>
+          <small class="text-secondary ms-2">최근 {{ fmtDuration(windowSec) }} 기준 · 총 {{ allRows.length }}개 라우트</small>
         </h5>
         <button class="btn-close" @click="$emit('close')"></button>
       </div>
 
       <div class="modal-body p-0 d-flex flex-column">
+        <div v-if="coverage" class="small text-secondary px-3 pt-2" data-testid="route-coverage">
+          {{ t('reqDialog.coverage', { since: fmt.dateTime(coverage.collectedSince, { hour12: false }), resolution: fmtDuration(coverage.resolutionSec) }) }}
+          <span v-if="selected"> · {{ t('reqDialog.bucketSize', { interval: fmtDuration(selected.intervalSec || 1) }) }}</span>
+        </div>
         <!-- 상단 툴바 -->
         <div class="routes-toolbar">
           <div class="d-flex gap-3 align-items-center flex-wrap">
@@ -175,6 +190,7 @@ function displayPath(r) {
                 <option :value="120">{{ fmtDuration(120) }}</option>
                 <option :value="300">{{ fmtDuration(300) }}</option>
                 <option :value="600">{{ fmtDuration(600) }}</option>
+                <option v-for="seconds in [1800, 3600, 21600, 43200, 86400]" :key="seconds" :value="seconds">{{ fmtDuration(seconds) }}</option>
               </select>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -240,7 +256,7 @@ function displayPath(r) {
               <tbody>
                 <tr v-if="!allRows.length">
                   <td colspan="6" class="text-center text-secondary py-4">
-                    <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                    <span v-if="loading && !allRows.length" class="spinner-border spinner-border-sm me-2"></span>
                     {{ t('controllerRequests.k14') }}
                   </td>
                 </tr>

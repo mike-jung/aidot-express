@@ -83,6 +83,16 @@ function workspaceRootFromEnv() {
 }
 
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier.startsWith('@aidot/')) {
+    const relative = specifier.slice('@aidot/'.length);
+    const parts = relative.split('/');
+    if (!FRAMEWORK_DIRS.has(parts[0]) || parts.some(part => !part || part === '.' || part === '..')
+        || /[\\?#%]/.test(relative)) {
+      throw new Error(`Invalid Aidot framework import: ${specifier}`);
+    }
+    return nextResolve(pathToFileURL(path.join(projectRoot, 'src', relative)).href, context);
+  }
+
   const m = /^\.\.\/([^/]+)\/(.+)$/.exec(specifier);
   if (m && FRAMEWORK_DIRS.has(m[1]) && context.parentURL && context.parentURL.startsWith('file:')) {
     const ws = workspaceRootFromEnv();

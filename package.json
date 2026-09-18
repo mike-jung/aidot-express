@@ -1,6 +1,6 @@
 {
   "name": "aidot-express",
-  "version": "1.45.6",
+  "version": "1.45.7",
   "description": "A Spring Boot style Node.js and Express web server framework",
   "type": "module",
   "engines": {
@@ -48,6 +48,8 @@
     "server:health": "node scripts/server/health.mjs"
   },
   "dependencies": {
+    "@babel/parser": "8.0.5",
+    "@peculiar/x509": "2.1.0",
     "adm-zip": "^0.6.0",
     "argon2": "^0.45.1",
     "axios": "^1.19.0",
@@ -63,12 +65,11 @@
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.5.3",
     "morgan": "^1.11.0",
+    "reflect-metadata": "0.2.2",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.4.3",
-    "@peculiar/x509": "2.1.0",
-    "reflect-metadata": "0.2.2"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
