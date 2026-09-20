@@ -381,6 +381,7 @@ const dotenvOverrides = {
   // v1.7.6: default.js 에 있으면서 .env 매핑이 없어 조정 자체가 불가능하던 운영 항목들.
   //   폐쇄망 고객이 소스를 고치지 않고는 rate-limit / CSP / 로그 보관을 바꿀 수 없었다.
   security: {
+    consoleAccess: process.env.CONSOLE_ACCESS || undefined,
     csp: process.env.SECURITY_CSP !== undefined
       ? (process.env.SECURITY_CSP === 'true' || process.env.SECURITY_CSP === '1')
       : undefined,

@@ -151,6 +151,9 @@ const menuGroups = computed(() => ([
       requiresFlag: 'haEnabled' },
     { name: 'users',        path: '/users',        label: t('menu.users'),   icon: 'bi-people',
       requiresRole: 'admin' },
+    // 연동 업체 계정 — 콘솔 계정과 분리된 realm='user' / role='vendor' 계정
+    { name: 'api-users',    path: '/api-users',    label: '연동 업체 계정',   icon: 'bi-hdd-network',
+      requiresRole: 'admin' },
   ]},
 ]));
 

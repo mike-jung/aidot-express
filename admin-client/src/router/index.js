@@ -57,6 +57,9 @@ const routes = [
         meta: { title: 'ha' } },
       { path: 'users', name: 'users',             component: () => import('../views/UserList.vue'),
         meta: { requiresAuth: true, requiresRole: 'admin' } },
+      // 연동 업체 계정 — users.role='vendor'. 콘솔 계정(admin_users)과 분리되어 있다.
+      { path: 'api-users', name: 'api-users',     component: () => import('../views/ApiUserList.vue'),
+        meta: { requiresAuth: true, requiresRole: 'admin' } },
       { path: 'scenarios', name: 'scenarios',                  component: () => import('../views/ScenarioList.vue') },
       { path: 'scenarios/:id/edit', name: 'scenario-edit',     component: () => import('../views/ScenarioEditor.vue') },
       { path: 'scenarios/:id/run',  name: 'scenario-run',      component: () => import('../views/ScenarioRun.vue') },

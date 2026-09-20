@@ -100,6 +100,14 @@ export default {
   },
   security: {
     csp: false,
+    /**
+     * 관리 콘솔을 누구에게 열지. (.env CONSOLE_ACCESS)
+     *   all   (기본) 어디서나 — 지금까지의 동작.
+     *   local 이 서버가 도는 기기에서만. /api/admin/* 과 콘솔 화면이 그 밖에서는 404.
+     *         업무 API 와 /health, /public, /uploads 는 영향받지 않는다.
+     * 리버스 프록시 뒤라면 TRUST_PROXY 를 함께 맞춰야 판정이 정확하다.
+     */
+    consoleAccess: 'all',
     rateLimit: {
       enabled: true,
       windowMs: 15 * 60 * 1000,
