@@ -1,5 +1,5 @@
 {
-  "version": "1.45.8",
+  "version": "1.45.9",
   "edition": "public",
   "files": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "429531eccca40bd3d21d33331ed05bc42660831749351c6aa067fb23253e138b"
+      "sha256": "6877bdb825a623116f1fe6f8567492d5096511307a6cd62534b3aa05ee1d55a3"
     },
     {
       "path": "admin-client/.gitignore",
@@ -640,7 +640,7 @@
     },
     {
       "path": "lib/admin/controller/ApiUserController.js",
-      "sha256": "4644b3bab801c25fac956d211dbd50d8a351407b4ae122c58d3f59b528d7665f"
+      "sha256": "96c7a501173c9a9da2c7d3e073f1d098d9e11aa93903d703def525c25499c631"
     },
     {
       "path": "lib/admin/controller/BlocklistController.js",
@@ -1756,7 +1756,7 @@
     },
     {
       "path": "admin-client/dist/aidot-edition.json",
-      "sha256": "8fcea5cee5070fac07737cd9d29cc1d431c3ffc35db56eb106d0181d257258ff"
+      "sha256": "cbe5d69f23e77328cab5fd4efa28bf37aa5514ae5449cea44320641d7093ad29"
     },
     {
       "path": "admin-client/dist/assets/AccessStatsPage-DJRYTejQ.css",
@@ -2148,7 +2148,7 @@
     },
     {
       "path": "stubs/README.md",
-      "sha256": "429531eccca40bd3d21d33331ed05bc42660831749351c6aa067fb23253e138b"
+      "sha256": "6877bdb825a623116f1fe6f8567492d5096511307a6cd62534b3aa05ee1d55a3"
     },
     {
       "path": "stubs/docs/BUILD_AND_RELEASE.md",
@@ -2232,7 +2232,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "8b215a7afdff5f7080a570754459677e326471b6ed228328d8dbd2be3e8d8b4f"
+      "sha256": "df17b6fcd5aedf9f7c37195c6eec30f2eff7628dfa7a771764fbd3e9ecd4635b"
     },
     {
       "path": "admin-client/package.json",
