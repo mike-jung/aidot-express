@@ -1,10 +1,10 @@
 {
-  "version": "1.45.10",
+  "version": "1.45.11",
   "edition": "public",
   "files": [
     {
       "path": ".env.example",
-      "sha256": "1fd36310fa1951766c5381f48d1858ec638ed6e5ffd9f886f14cdea7d67d8df4"
+      "sha256": "66a03f02520e7f830e8f0bf51886512f86e2707b9e88c94d41f271a2dbbb41da"
     },
     {
       "path": ".gitattributes",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "6d0ad619fd702f970c7a22fe8e4df87a672c401197812bc7bdf4fd9f53509f8a"
+      "sha256": "3aabbe0721056fc023293ff720533bbf11c680070f8a558fd7d770691f64ad71"
     },
     {
       "path": "admin-client/.gitignore",
@@ -507,6 +507,10 @@
       "sha256": "6fae38207c3ae1edd99a54e58ad0c4e32b88610b1f92761425113f683412ac81"
     },
     {
+      "path": "docs/CODE_LOADING.md",
+      "sha256": "7d3c41040c5062d0aaba3bea542d905c582612f257041e3e87afbec107c7bf90"
+    },
+    {
       "path": "docs/HTTPS.md",
       "sha256": "7b51bf230d24bfe86286217026f86749e9d7696cd2c11a0cfe93fbd91ae89cd7"
     },
@@ -896,7 +900,7 @@
     },
     {
       "path": "lib/admin/service/ControllerMetaService.js",
-      "sha256": "3f0010f752a54178e1043568da905200c7486779e5aff2a01b1fa821c65d0f1c"
+      "sha256": "160295c15acfae6ca366d414d78e7cdbd8c897e7c7a82724efa9ae0049a7a290"
     },
     {
       "path": "lib/admin/service/HttpsService.js",
@@ -924,7 +928,7 @@
     },
     {
       "path": "lib/admin/service/ServiceMetaService.js",
-      "sha256": "15f1d245a05a8d5019ac1dbff9d2d2d50ddc5f395fce7ea4ec132dc019c43fd9"
+      "sha256": "488bb41c843b5774ef3c29bffcad19250f2b1a3d6738c1d745512e57f4a20a20"
     },
     {
       "path": "lib/admin/service/SqlMetaService.js",
@@ -932,7 +936,11 @@
     },
     {
       "path": "lib/admin/service/WorkspaceLoadService.js",
-      "sha256": "3f1d547e43e7ad5b12ba777f2fe5792b519ff5a75fef2ce074ef46f7fc272860"
+      "sha256": "a05d2255f530023d5e2cf0711b5ee1736bbc94a6c98e37aff67834ffdf8bd61a"
+    },
+    {
+      "path": "lib/admin/service/codeFileUpdate.js",
+      "sha256": "071490772f6a3a36ebb25faf75d66162ed8d8f5c03b2a797988f4cb254d08b74"
     },
     {
       "path": "lib/admin/service/codeGenerator.js",
@@ -984,7 +992,7 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "4dd1329b1034db359f70573c7b8351f3258ee49176b18c68518f86504a48113d"
+      "sha256": "299ac2841882830e4fbd3960e34542546ae2faa7400f5297d2dabaddfd8baf5c"
     },
     {
       "path": "public/demo/guestbook-lab.html",
@@ -1088,7 +1096,7 @@
     },
     {
       "path": "scripts/publish/public-filter.json",
-      "sha256": "445bc0c4af03ee8f87110e1a3629f6f10bbc31f8513321a1b3099dddd04a5174"
+      "sha256": "9c3ebf203f54e6f7b9ce5b3947339992624d5472bcd8dbe9cc69184b2f597202"
     },
     {
       "path": "scripts/security-e2e.mjs",
@@ -1180,7 +1188,7 @@
     },
     {
       "path": "src/app.js",
-      "sha256": "20b8d41fbcb51d0eef2f1d1fa4019510891fd339ddfa08bc2929db634510e002"
+      "sha256": "d6c2ae47b4fbe09c808a53ab68b7ab45da9a15ea980044638157625971cc110f"
     },
     {
       "path": "src/config/default.js",
@@ -1311,16 +1319,24 @@
       "sha256": "57ab1c84f4052f3545a7bd124d12d8b8bc6ec58fae825fbee73d2615f97dfbfc"
     },
     {
+      "path": "src/core/codeErrors.js",
+      "sha256": "7eeaa9a50bd53539d9166cfc016cb027d3f063c5cfe42432ff8df22b1438cac1"
+    },
+    {
+      "path": "src/core/codeLoadBoundary.js",
+      "sha256": "8c06e2c5a73db6e7ee913ce1f7730ec71ba6bac1314e6432106d7d034e659e44"
+    },
+    {
       "path": "src/core/consoleAccess.js",
       "sha256": "a8cb573a27be0fc70618273d23c5cc7e0ba2aa6d6cc607d06e6f410ec73e0e8e"
     },
     {
       "path": "src/core/container.js",
-      "sha256": "78e362fabd0d9bda6a75be90e38bf62f424f3fac7219dcf419eed06b2302c8dd"
+      "sha256": "1583a32e4172b49b001c41af68fb9d791ead83067cbecd49a7aa596c84cd6aa2"
     },
     {
       "path": "src/core/controllerLoader.js",
-      "sha256": "33fa17fe3e1bbe71710cf08ff841cdd8dc6b86a17c8129f3ccb66c801a44f2a2"
+      "sha256": "bc5e132a629345f0ced0703a2a9643bd8d82dceb7ded07419e0c6cfd232de411"
     },
     {
       "path": "src/core/corsConfig.js",
@@ -1328,7 +1344,7 @@
     },
     {
       "path": "src/core/decorators.js",
-      "sha256": "3b81c082c504812dd4a8fe2a397c9f3c490e671b06d1327c100c7f8eba1ab49d"
+      "sha256": "b03d206375f0e1b389cae0978fb331d388e8cfdc83901d16dcc445732f717e99"
     },
     {
       "path": "src/core/ha/agent.js",
@@ -1703,12 +1719,20 @@
       "sha256": "253b97722f277d49280985f0e1b941236dcf903aca80301d8e0208cfa1553bde"
     },
     {
+      "path": "tests/code-loading.test.mjs",
+      "sha256": "bb9aa1d8d582c4524e1f382259b8afc3b1e6886fe7d0c94bb66da09c887f3ff7"
+    },
+    {
       "path": "tests/cors-compat.test.mjs",
       "sha256": "9c2d897899da0bb48f5f0e24918b50a184e6a6abeb996e1b3ee65ba9824a1452"
     },
     {
       "path": "tests/external-server.test.mjs",
       "sha256": "818750e661914561579902e6914d1d854b6cb2104a287b083efb530de9d74942"
+    },
+    {
+      "path": "tests/fixtures/code-loading.mjs",
+      "sha256": "af023b7f673f0891a86fb9b93eeed33affefe0c8add1094a8e6ef18a309d9915"
     },
     {
       "path": "tests/handler-signature.test.mjs",
@@ -1756,7 +1780,7 @@
     },
     {
       "path": "admin-client/dist/aidot-edition.json",
-      "sha256": "4a4d2a682572a90fd10008b9e9215fb648e53280c0ef75a40cefbc126a9f0fa1"
+      "sha256": "b81f390120f50a5883d45e26e68ad518f865d3a54d104569d6b50cd5ff6171ef"
     },
     {
       "path": "admin-client/dist/assets/AccessStatsPage-DJRYTejQ.css",
@@ -2388,7 +2412,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "28efe55dd377f7f2c34b9d07da28ad9a35f507ccb8f3e57de319db64ff996e04"
+      "sha256": "a9b0570dcbd2ca1a4c6bfe328a1a68f40334a5ab64c2d07fa8f3e7d5bf249a8b"
     },
     {
       "path": "admin-client/package.json",

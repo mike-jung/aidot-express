@@ -104,7 +104,8 @@
       "docs/aidot-express-tutorial-v1.32.0.pdf",
       "docs/aidot-express-tutorial-v1.32.0_ko.pdf",
       "docs/HTTPS.md",
-      "docs/SERVER_INSTALL.md"
+      "docs/SERVER_INSTALL.md",
+      "docs/CODE_LOADING.md"
     ],
     "tests/**": [
       "tests/security-hardening.test.mjs",
@@ -117,7 +118,9 @@
       "tests/table-prefix.test.mjs",
       "tests/migration-recover.test.mjs",
       "tests/https.test.mjs",
-      "tests/server-package.test.mjs"
+      "tests/server-package.test.mjs",
+      "tests/code-loading.test.mjs",
+      "tests/fixtures/code-loading.mjs"
     ],
     "*": [
       ".env.example",
@@ -266,7 +269,8 @@
     "dist:server:linux",
     "server:configure",
     "server:run",
-    "server:health"
+    "server:health",
+    "test:loading"
   ],
   "requiredFiles": [
     "README.md",

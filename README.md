@@ -10,7 +10,7 @@ and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
-![Version](https://img.shields.io/badge/version-1.45.10-orange)
+![Version](https://img.shields.io/badge/version-1.45.11-orange)
 
 </div>
 
@@ -175,6 +175,29 @@ in Axios or `credentials: 'include'` in fetch and configure the cookie settings
 for the deployment. See [Security operations](docs/SECURITY_OPERATIONS.md).
 
 ---
+
+## Controller and service loading failures
+
+From 1.45.11, failed controller/service loads leave unrelated APIs running. A failed
+controller reload keeps its previous router; failed service imports discard staged
+DI registrations. Replacements of already-used services validate their constructors
+before switching. Console edits also restore the previous source and metadata when
+loading fails. New services remain lazy: a constructor failure on first use becomes
+an error for that request.
+
+Loading errors, including non-Error throws and rejected Promises started during
+loading, are logged with `[CodeLoad]` and the source file. Development readiness
+responses include them in `details.skippedFiles`. No new `.env` setting is required.
+Optional `CODE_LOAD_TIMEOUT_MS` sets the async load limit per file (default: 30000ms).
+
+This is an in-process error boundary. It cannot stop synchronous infinite loops,
+`process.exit()`, native crashes or uncaught timer callbacks, and it cannot undo
+database/network side effects. Await initialization and handle background errors.
+See the [detailed analysis and limits](docs/CODE_LOADING.md) (Korean).
+
+```bash
+npm run test:loading
+```
 
 ## How it is laid out
 

@@ -2,6 +2,7 @@ import container from './container.js';
 import { addStep } from './requestContext.js';
 import sqlRegistry from './sqlLoader.js';
 import logger, { forService } from '../util/logger.js';
+import { codeError } from './codeErrors.js';
 
 /** 내부 키 */
 export const META = {
@@ -183,7 +184,7 @@ function traceService(svc, svcName) {
           out = v.apply(target, args);
         } catch (e) {
           addStep('service', `${svcName}.${prop}`, {
-            ms: Date.now() - started, ok: false, detail: String(e.message).slice(0, 200),
+            ms: Date.now() - started, ok: false, detail: codeError(e).message.slice(0, 200),
           });
           throw e;
         }
@@ -193,7 +194,7 @@ function traceService(svc, svcName) {
             (r) => { addStep('service', `${svcName}.${prop}`, { ms: Date.now() - started }); return r; },
             (e) => {
               addStep('service', `${svcName}.${prop}`, {
-                ms: Date.now() - started, ok: false, detail: String(e?.message ?? e).slice(0, 200),
+                ms: Date.now() - started, ok: false, detail: codeError(e).message.slice(0, 200),
               });
               throw e;
             },

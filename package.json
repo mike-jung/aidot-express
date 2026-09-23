@@ -1,6 +1,6 @@
 {
   "name": "aidot-express",
-  "version": "1.45.10",
+  "version": "1.45.11",
   "description": "A Spring Boot style Node.js and Express web server framework",
   "type": "module",
   "engines": {
@@ -45,7 +45,8 @@
     "dist:server:linux": "node scripts/server/package.mjs --platform linux",
     "server:configure": "node scripts/server/config.mjs",
     "server:run": "node scripts/server/run.mjs",
-    "server:health": "node scripts/server/health.mjs"
+    "server:health": "node scripts/server/health.mjs",
+    "test:loading": "node --import ./src/loader/register.mjs --test tests/code-loading.test.mjs"
   },
   "dependencies": {
     "@babel/parser": "8.0.5",

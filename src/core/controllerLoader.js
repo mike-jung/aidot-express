@@ -44,6 +44,11 @@ import { isBlocked, blockInfo } from './blocklist.js';   // ★ v1.13.0
 import sseHub from './sse.js';
 import { consumeTicket } from './sseTicket.js';
 import logger, { isAdminService } from '../util/logger.js';
+import { METHODS } from 'node:http';
+import container from './container.js';
+import { codeError } from './codeErrors.js';
+import { runCodeLoad, reportCodeProblem } from './codeLoadBoundary.js';
+export { bootProblems } from './codeLoadBoundary.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), '..', '..');
@@ -77,18 +82,24 @@ function buildErrorResponse(status, message, requestCode, extra = {}) {
   };
 }
 
+let importGeneration = 0;
+const serviceImportAttempts = new Set();
+const httpMethods = new Set([...METHODS.map(method => method.toLowerCase()), 'all']);
 function bustImport(filePath) {
-  return `${pathToFileURL(filePath).href}?t=${Date.now()}`;
+  return `${pathToFileURL(filePath).href}?load=${++importGeneration}`;
 }
 
-function walk(dir) {
+function walk(dir, kind) {
   const out = [];
   if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+  catch (error) { reportCodeProblem(kind, dir, error, 'scan'); return out; }
+  for (const entry of entries) {
     const full = path.join(dir, entry.name);
     // 사이드카 메타 폴더는 스캔하지 않음 (lib/admin/service/metaStorage.js 참조)
     if (entry.isDirectory() && entry.name === 'meta') continue;
-    if (entry.isDirectory()) out.push(...walk(full));
+    if (entry.isDirectory()) out.push(...walk(full, kind));
     else if (entry.isFile() && /\.(m?js|ts)$/.test(entry.name)) out.push(full);
   }
   return out;
@@ -106,7 +117,8 @@ function joinPath(base, sub) {
 function _buildRouter(Ctor, sourceFile = null) {
   const basePath = Ctor[META.BASE_PATH] || '';
   const routes = Ctor[META.ROUTES] || [];
-  if (routes.length === 0) return null;
+  if (!Array.isArray(routes) || routes.length === 0) throw new Error(`[Controller] no routes on: ${Ctor.name}`);
+  if (typeof basePath !== 'string') throw new Error(`[Controller] basePath must be a string: ${Ctor.name}`);
 
   // admin 컨트롤러이며 log.admin=false 면 Response 디버그 로그 스킵
   const isAdminController = isAdminService(sourceFile || '');
@@ -125,10 +137,10 @@ function _buildRouter(Ctor, sourceFile = null) {
   for (const r of routes) {
     const fullPath = joinPath(basePath, r.path);
     const methodFn = router[r.method];
-    if (!methodFn) {
-      logger.error(`[Controller] unknown HTTP method: ${r.method} (${Ctor.name}.${r.handler})`);
-      continue;
+    if (!httpMethods.has(r.method) || typeof methodFn !== 'function') {
+      throw new Error(`[Controller] unknown HTTP method: ${r.method} (${Ctor.name}.${r.handler})`);
     }
+    if (typeof instance[r.handler] !== 'function') throw new Error(`[Controller] handler is not a function: ${Ctor.name}.${r.handler}`);
     const handler = instance[r.handler].bind(instance);
 
     methodFn.call(router, r.path || '/', async (req, res, next) => {
@@ -340,7 +352,7 @@ function _buildRouter(Ctor, sourceFile = null) {
           res.json(output);
         }
       } catch (err) {
-        next(err);
+        next(codeError(err));
       }
     });
 
@@ -352,6 +364,7 @@ function _buildRouter(Ctor, sourceFile = null) {
 
 /* 등록된 라우터를 app 또는 Router 의 스택에서 제거 */
 function _unregisterRouter(target, router) {
+  if (!target) return false;
   // Express 5: app.router.stack / Express 4: app._router.stack / Router: stack
   const stack = target.router?.stack || target._router?.stack || target.stack;
   if (!stack) return false;
@@ -375,19 +388,33 @@ function _unregisterRouter(target, router) {
  *    그래서 URL 뒤에 타임스탬프를 붙여 **새로 읽게** 한다(콘솔의 hot-reload 와 같은 수법).
  * @param {string} file  서비스 파일의 절대 경로
  */
-export async function loadSingleServiceFile(file) {
+export async function loadSingleServiceFile(file, { fresh = true, allowEmpty = false, quiet = false } = {}) {
+  file = path.resolve(file);
   const baseName = path.basename(file).replace(/\.(m?js|ts)$/i, '');
   if (isBlocked('services', baseName)) {
     throw Object.assign(new Error(`${baseName} 은 막혀 있어 올릴 수 없습니다`), { status: 409 });
   }
-  const url = `${pathToFileURL(file).href}?t=${Date.now()}`;
-  await import(url);
-  logger.info(`[Service] loaded one: ${baseName}`);
+  await container.transaction(() => runCodeLoad('service', file, async () => {
+    const mod = await import(fresh ? bustImport(file) : pathToFileURL(file).href);
+    // A dependency may have been evaluated in a previous failed transaction. ESM
+    // caches that evaluation, so restore exported @Service declarations on retry.
+    for (const Ctor of Object.values(mod)) {
+      if (typeof Ctor === 'function' && Ctor[META.IS_SERVICE] && !container.has(Ctor[META.SERVICE_NAME])) {
+        container.registerFactory(Ctor[META.SERVICE_NAME], () => new Ctor());
+      }
+    }
+    if (!allowEmpty && !container.pendingRegistrations().length) {
+      throw new Error(`[Service] no service registered: ${file}. Check @Service.`);
+    }
+    container.validateReplacements();
+  }));
+  if (!quiet) logger.info(`[Service] loaded one: ${baseName}`);
   return { name: baseName };
 }
 
 export async function loadServicesFromDir(dir) {
-  const files = walk(dir);
+  const files = walk(dir, 'service');
+  const result = { loaded: [], errors: [] };
   for (const file of files) {
     const baseName = path.basename(file).replace(/\.(m?js|ts)$/i, '');
     if (isBlocked('services', baseName)) {   // ★ v1.13.0
@@ -397,20 +424,22 @@ export async function loadServicesFromDir(dir) {
       continue;
     }
     try {
-      await import(pathToFileURL(file).href);
+      // Boot imports retain singleton helper modules shared with server.js. Retrying
+      // an attempted file must bypass ESM's cached success OR cached rejection.
+      const fresh = serviceImportAttempts.has(file);
+      serviceImportAttempts.add(file);
+      await loadSingleServiceFile(file, { fresh, allowEmpty: true, quiet: true });
+      result.loaded.push(file);
       logger.debug(`[Service] import: ${path.relative(projectRoot, file).replace(/\\/g, '/')}`);
     } catch (e) {
       /* ★ v1.11.1 — 사용자가 만든 파일 하나가 깨졌다고 서버가 통째로 안 뜨면 안 된다.
          예전에는 작업 폴더의 서비스 하나가 import 에 실패하면 "서버 부팅 실패" 로 끝났다.
          이제 그 파일만 건너뛰고 이유를 남긴다 — 그 서비스를 쓰는 컨트롤러는 호출 때 [DI] 오류가 난다. */
-      logger.error(`[Service] import failed — skipping this file: ${path.relative(projectRoot, file).replace(/\\/g, '/')}: ${e.message}`);
-      bootProblems.push({ kind: 'service', file, message: e.message });
+      result.errors.push({ kind: 'service', file, message: codeError(e).message });
     }
   }
+  return result;
 }
-
-/** ★ v1.11.1 — 기동 때 건너뛴 파일들 (기동 요약·/health/ready 에 보여 준다) */
-export const bootProblems = [];
 
 /**
  * ★ v1.10.42 — 설정된 **모든 폴더**에서 서비스를 읽는다.
@@ -418,9 +447,13 @@ export const bootProblems = [];
  *  같은 이름이면 **내가 만든 것이 이긴다**.
  */
 export async function loadServices() {
+  const result = { loaded: [], errors: [] };
   for (const dir of existingDirs('services')) {
-    await loadServicesFromDir(dir);
+    const part = await loadServicesFromDir(dir);
+    result.loaded.push(...part.loaded);
+    result.errors.push(...part.errors);
   }
+  return result;
 }
 
 /** 기동할 때 막혀 있어 건너뛴 것들 — 대시보드·헬스에서 보여 준다 */
@@ -428,7 +461,8 @@ export const blockedAtBoot = [];
 
 /* 임의 디렉토리에서 컨트롤러 파일 로드 */
 export async function loadControllersFromDir(app, dir) {
-  const files = walk(dir);
+  const files = walk(dir, 'controller');
+  const result = { loaded: [], errors: [] };
   for (const file of files) {
     /* ★ v1.13.0 — 막아 둔 컨트롤러는 **읽지 않는다**. 운영 중에 내린 것이 재기동으로 되살아나면
        막은 의미가 없다(감시가 새벽에 재기동하는 순간 구멍이 다시 열린다). */
@@ -441,11 +475,13 @@ export async function loadControllersFromDir(app, dir) {
     }
     try {
       await loadSingleControllerFile(app, file);
+      result.loaded.push(file);
     } catch (e) {
       // ★ v1.11.1 — 컨트롤러 파일 하나가 깨져도 나머지는 뜬다 (loadSingleControllerFile 이 이미 로그를 남겼다)
-      bootProblems.push({ kind: 'controller', file, message: e.message });
+      result.errors.push({ kind: 'controller', file, message: codeError(e).message });
     }
   }
+  return result;
 }
 
 /** ★ v1.10.42 — 설정된 모든 폴더에서 컨트롤러를 읽는다 (작업 폴더 포함) */
@@ -456,45 +492,42 @@ export async function loadControllers(app) {
 }
 
 /* 단일 파일을 (재)로딩하고 라우터에 등록 */
-export async function loadSingleControllerFile(app, file) {
-  let mod;
-  try {
-    mod = await import(bustImport(file));
-  } catch (e) {
-    logger.error(`[Controller] import failed: ${file}: ${e.message}`);
-    throw e;
+export async function loadSingleControllerFile(app, file, { replacesFile = file } = {}) {
+  file = path.resolve(file);
+  replacesFile = path.resolve(replacesFile);
+  const baseName = path.basename(file).replace(/\.(m?js|ts)$/i, '');
+  if (isBlocked('controllers', baseName)) {
+    throw Object.assign(new Error(`${baseName} 은 막혀 있어 올릴 수 없습니다`), { status: 409 });
   }
-  const Ctor = mod.default;
-  if (!Ctor || typeof Ctor !== 'function') {
-    logger.warn(`[Controller] the default export is not a class: ${file}`);
-    return null;
-  }
-  if (!Ctor[META.IS_CONTROLLER]) {
-    logger.warn(`[Controller] @Controller is missing on: ${Ctor.name}`);
-    return null;
-  }
-
-  const basePath = Ctor[META.BASE_PATH] || '';
-
-  // 같은 basePath 의 기존 라우터가 있으면 제거 (hot-reload)
-  const prev = registeredControllers.get(basePath);
-  if (prev) {
-    // dynamicRouter 와 app 양쪽에서 제거 시도
-    _unregisterRouter(dynamicRouter, prev.router);
-    _unregisterRouter(app, prev.router);
-    logger.info(`[Controller] hot-reload: ${prev.ctor.name} removed (basePath=${basePath})`);
-  }
-
-  const built = _buildRouter(Ctor, file);
-  if (!built) {
-    logger.warn(`[Controller] no routes on: ${Ctor.name}`);
-    return null;
-  }
-
-  // ★ dynamicRouter 에 등록 (404 핸들러 이전에 위치하므로 동적 추가도 정상 접근 가능)
-  dynamicRouter.use(built.basePath || '/', built.router);
-  registeredControllers.set(basePath, { router: built.router, ctor: Ctor, file });
-  return { Ctor, basePath, file };
+  return container.transaction(async () => {
+    const { Ctor, built, layer } = await runCodeLoad('controller', file, async () => {
+      const mod = await import(bustImport(file));
+      const Ctor = mod.default;
+      if (typeof Ctor !== 'function') throw new Error(`[Controller] the default export is not a class: ${file}`);
+      if (!Ctor[META.IS_CONTROLLER]) throw new Error(`[Controller] @Controller is missing on: ${Ctor.name}`);
+      const built = _buildRouter(Ctor, file);
+      // Validate the mount path too, without touching the live router stack.
+      const candidate = express.Router();
+      candidate.use(built.basePath || '/', built.router);
+      container.validateReplacements();
+      return { Ctor, built, layer: candidate.stack[0] };
+    });
+    const basePath = built.basePath;
+    const previous = [...registeredControllers.entries()].filter(([base, info]) =>
+      base === basePath || info.file === file || info.file === replacesFile);
+    const indexes = previous.map(([, info]) => dynamicRouter.stack.findIndex(item => item.handle === info.router))
+      .filter(index => index >= 0);
+    const index = indexes.length ? Math.min(...indexes) : dynamicRouter.stack.length;
+    // No await between validation and publication. Preserve route precedence on replacement.
+    for (const [base, info] of previous) {
+      _unregisterRouter(dynamicRouter, info.router);
+      _unregisterRouter(app, info.router);
+      registeredControllers.delete(base);
+    }
+    dynamicRouter.stack.splice(index, 0, layer);
+    registeredControllers.set(basePath, { router: built.router, ctor: Ctor, file });
+    return { Ctor, basePath, file };
+  });
 }
 
 /** 등록된 모든 컨트롤러 정보 조회 (admin UI 용) */
@@ -530,4 +563,3 @@ export function listRegisteredControllers() {
   }
   return out;
 }
-

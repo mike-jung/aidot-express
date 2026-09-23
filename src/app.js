@@ -19,6 +19,14 @@ import { installDbInterceptor } from './secure/dbInterceptor.js';
    try/catch 안이라 조용히 실패해 "정상 종료 때 추적 기록을 비운다" 가 실제로는 동작하지 않았다.
    (이번 판에서 종료 절차를 손보다 발견) */
 import traceWriter from './core/traceWriter.js';
+import { installCodeRejectionHandler } from './core/codeLoadBoundary.js';
+
+// Install before createServer() imports application code, not after server.listen().
+let stopForFatalRejection = (error) => {
+  logger.error(error);
+  process.exit(1);
+};
+installCodeRejectionHandler(error => stopForFatalRejection(error));
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), '..');
@@ -66,10 +74,6 @@ async function main() {
 
   configureHttpServer(server, config.server);
 
-  process.on('unhandledRejection', (reason) => {
-    logger.error(reason instanceof Error ? reason : new Error(String(reason)));
-    shutdown('UNHANDLED_REJECTION', 1);
-  });
   process.on('uncaughtException', (err) => {
     logger.error(err);
     shutdown('UNCAUGHT_EXCEPTION', 1);
@@ -120,6 +124,10 @@ async function main() {
       process.exit(exitCode);
     });
     setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  stopForFatalRejection = (error) => {
+    logger.error(error);
+    shutdown('UNHANDLED_REJECTION', 1);
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
