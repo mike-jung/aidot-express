@@ -10,11 +10,13 @@ and hot-reload that means you almost never restart.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen)
-![Version](https://img.shields.io/badge/version-1.45.9-orange)
+![Version](https://img.shields.io/badge/version-1.45.10-orange)
 
 </div>
 
 ---
+
+For the current release, see [upgrade instructions](docs/UPGRADE.md).
 
 ## Why another Node framework?
 
@@ -66,7 +68,9 @@ npm start
 ```
 
 Open **http://localhost:7901** and log in with `admin` / `admin1234`
-(development only). The initial-password reminder does not block authorized console features. You can change the password later in Settings.
+(development only). The initial-password banner is a reminder: you can keep using
+all console features permitted by your account without changing the password.
+You can change it later in Settings. Refreshing a page restores your signed-in session.
 For production, set `ADMIN_INITIAL_PASSWORD` before the first start.
 
 ### Your first endpoint, in about a minute
@@ -82,6 +86,93 @@ For production, set `ADMIN_INITIAL_PASSWORD` before the first start.
 Prefer your own editor? Drop the files into `workspace/controller`,
 `workspace/service` and `workspace/sql`. The console lists them with a
 **Not loaded** badge and a one-click button to load each one.
+
+---
+
+## CORS for Vue and other browser clients
+
+A Vue development page at `http://localhost:5173` and an API at
+`http://localhost:7901` have different origins because their ports differ.
+Both Public and Enterprise Full include CORS middleware, but a separate browser
+frontend must be explicitly allowed. With the shipped defaults, an unlisted
+`Origin` receives `403 Origin not allowed` before the controller runs, without
+an `Access-Control-Allow-Origin` header. The browser reports this as a CORS error.
+
+**Configure the backend.** Add or update this entry in the **aidot-express
+server's active `.env`**, rather than the Vue project's `.env`:
+
+```dotenv
+CORS_ORIGIN=http://localhost:5173
+```
+
+For both local development addresses, use a comma-separated list. Keep any
+other frontend origins that your deployment still needs:
+
+```dotenv
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
+```
+
+Use the **frontend origin**: scheme, hostname and port. Do not put the API
+server address or a path such as `/api/game` in this setting. `localhost` and
+`127.0.0.1` are distinct origins, as are HTTP and HTTPS. For production, list
+the exact trusted frontend origins, for example `https://app.example.com`.
+
+With the shipped defaults, a request whose Origin is `http://localhost:5173`
+has the following result:
+
+| Backend `CORS_ORIGIN` | Origin policy result |
+| --- | --- |
+| Missing or empty | Rejected; same-origin browser use remains allowed |
+| `*` | Rejected; the legacy wildcard is ignored with a startup warning |
+| `http://localhost:7901` | Rejected; this lists the API origin |
+| `http://127.0.0.1:5173` only | Rejected; this does not match `localhost` |
+| `http://localhost:5173` | Allowed; normal routing and authentication still apply |
+
+Exact-origin checks were introduced in 1.43.0. Since 1.44.1, legacy `*`
+settings let the server start but do not grant access to arbitrary origins.
+
+**Check which configuration is active, then restart.** A `.env` file is not
+required if `CORS_ORIGIN` is supplied through the process environment. However,
+this project's `.env` loader overrides an existing environment variable when
+the same key appears in a loaded file. Check the startup log's
+`[config] .env loaded` paths; an explicit `AIDOT_ENV_FILE` or Electron user-data
+file can take precedence over the project-root `.env`.
+Restart the complete server, supervisor, Electron app or service after changing
+the setting. Controller/service hot reload does not reload the CORS allowlist.
+
+**Vue / Vite proxy behavior.** To use a Vite `/api` proxy, call relative URLs
+such as `axios.get('/api/game')`. A call to
+`http://localhost:7901/api/game` goes directly to the backend and bypasses that
+proxy. Also, `changeOrigin: true` changes the upstream Host header; it does not
+by itself rewrite the HTTP Origin header. The supplied sample/generated proxy
+configuration can therefore pass a GET without Origin while a POST carrying
+`Origin: http://localhost:5173` is rejected by the backend. Register the actual
+frontend origin as above even when using that proxy. In this case the frontend
+receives a same-origin HTTP 403, rather than a browser CORS block.
+Vite's development proxy is not part of the built frontend; production needs
+its own reverse proxy or an explicitly allowed frontend origin.
+
+**Verify the response headers.** Send an Origin-bearing request and a preflight
+request (on Windows PowerShell, use `curl.exe` instead of `curl`):
+
+```bash
+curl -i "http://localhost:7901/api/game" -H "Origin: http://localhost:5173"
+curl -i -X OPTIONS "http://localhost:7901/api/game" -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type,authorization"
+```
+
+An allowed preflight normally returns `204` with these headers:
+
+```http
+Access-Control-Allow-Origin: http://localhost:5173
+Access-Control-Allow-Credentials: true
+```
+
+A successful preflight confirms the origin policy; the actual request still
+needs an existing route and any required credentials. Requests made by
+Postman/curl without Origin do not verify browser CORS behavior. For
+cookie-based cross-origin authentication, also enable `withCredentials: true`
+in Axios or `credentials: 'include'` in fetch and configure the cookie settings
+for the deployment. See [Security operations](docs/SECURITY_OPERATIONS.md).
 
 ---
 
@@ -156,7 +247,7 @@ npm run check:sfc # compile Vue components
 
 Use a separate test server for manual browser checks. A successful syntax check
 does not replace browser, database or installer testing. See
-[Build and run](docs/BUILD_AND_RELEASE.md) for the available Public commands.
+[Build and run](docs/BUILD_AND_RELEASE.md) for edition-specific commands.
 
 ---
 

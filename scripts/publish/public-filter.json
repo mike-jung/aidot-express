@@ -3,7 +3,7 @@
     "Public distribution policy shared by source export and Electron builds.",
     "Enterprise implementations and Full operator guides use explicitly reviewed replacements.",
     "Root files, authoring areas and npm commands are allowlisted. Unknown files in those areas are private by default.",
-    "Public README and operator guides use reviewed replacements; Full upgrade and publishing instructions stay in Full."
+    "The root README.md is the shared public-facing document. Operator guides use reviewed replacements; Full upgrade and publishing instructions stay in Full."
   ],
   "deny": [
     "mci-server/**",
@@ -210,7 +210,6 @@
     ],
     "files": [
       "lib/admin/service/BackupService.js",
-      "README.md",
       "docs/BUILD_AND_RELEASE.md",
       "docs/UPGRADE.md",
       "docs/WINDOWS_OPERATIONS.md",
@@ -270,6 +269,7 @@
     "server:health"
   ],
   "requiredFiles": [
+    "README.md",
     "scripts/start.mjs",
     "scripts/startup-dependencies.mjs",
     "scripts/startup-config.mjs"
